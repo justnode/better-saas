@@ -1,3 +1,4 @@
+
 import { useParams, useRouter } from 'next/navigation';
 import { useAuthInitialized, useAuthLoading, useIsAuthenticated } from '@/store/auth-store';
 import type { UseNavbarReturn, LogoConfig, AuthConfig, MenuItem } from '@/types/navbar';
@@ -63,6 +64,11 @@ export function useNavbar(): UseNavbarReturn {
       url: `/${locale}/blocks`,
     },
     {
+      title: 'Pricing',
+      url: `/${locale}#pricing`,
+      onClick: handlePricingClick,
+    },
+    {
       title: 'Resources',
       url: '#',
       items: [
@@ -87,12 +93,8 @@ export function useNavbar(): UseNavbarReturn {
           url: '#',
         },
       ],
-    },
-    {
-      title: 'Pricing',
-      url: `/${locale}#pricing`,
-      onClick: handlePricingClick,
-    },
+    }
+    
   ];
 
   return {

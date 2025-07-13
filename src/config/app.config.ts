@@ -1,48 +1,4 @@
-export interface AppConfig {
-  app: {
-    name: string;
-    version: string;
-    description: string;
-    url: string;
-    domain: string;
-  };
-  metadata: {
-    title: {
-      default: string;
-      template: string;
-    };
-    description: string;
-    keywords: string[];
-    authors: Array<{ name: string; url?: string }>;
-    creator: string;
-    robots: {
-      index: boolean;
-      follow: boolean;
-    };
-    openGraph: {
-      type: string;
-      locale: string;
-      url: string;
-      siteName: string;
-    };
-    twitter: {
-      card: string;
-      creator: string;
-    };
-  };
-  admin: {
-    emails: string[];
-  };
-  upload: {
-    maxFileSize: number;
-    allowedTypes: string[];
-    maxFiles: number;
-  };
-  pagination: {
-    defaultPageSize: number;
-    maxPageSize: number;
-  };
-}
+import type { AppConfig } from "@/types";
 
 export const appConfig: AppConfig = {
   // Application basic information

@@ -54,7 +54,7 @@ export function LanguageSwitcher() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-2">
           <Globe className="h-4 w-4" />
-          {currentLanguage?.name || 'English'}
+          {currentLanguage?.nativeName || 'English'}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -64,8 +64,8 @@ export function LanguageSwitcher() {
             onClick={() => handleLanguageChange(lang.locale)}
             className={locale === lang.locale ? 'bg-accent' : ''}
           >
-            {lang.name}
-          </DropdownMenuItem>
+            {lang.nativeName}
+          </DropdownMenuItem>   
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
