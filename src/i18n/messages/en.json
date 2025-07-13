@@ -59,7 +59,18 @@
     "googleSignUp": "Sign up with Google",
     "signingUp": "Signing up...",
     "orContinueWith": "Or continue with",
-    "signUpButton": "Sign Up"
+    "signUpButton": "Sign Up",
+    "noAccount": "Don't have an account?",
+    "signUpLink": "Sign up",
+    "alreadyHaveAccount": "Already have an account?",
+    "loginLink": "Sign in",
+    "termsOfService": "Terms of Service",
+    "privacyPolicy": "Privacy Policy",
+    "termsAndPrivacy": {
+      "prefix": "By clicking continue, you agree to our",
+      "middle": "and",
+      "suffix": "."
+    }
   },
   "dashboard": {
     "title": "Dashboard",
@@ -211,6 +222,78 @@
     "author": "Author",
     "publishedOn": "Published on",
     "tags": "Tags"
+  },
+  "legal": {
+    "terms": {
+      "title": "Terms of Service",
+      "lastUpdated": "Last updated: {date}",
+      "introduction": "Welcome to our service. These terms and conditions outline the rules and regulations for the use of our website and services.",
+      "acceptance": {
+        "title": "Acceptance of Terms",
+        "content": "By accessing and using this service, you accept and agree to be bound by the terms and provision of this agreement."
+      },
+      "useOfService": {
+        "title": "Use of Service",
+        "content": "You may use our service for lawful purposes only. You agree not to use the service in any way that violates any applicable federal, state, local, or international law or regulation."
+      },
+      "userAccounts": {
+        "title": "User Accounts",
+        "content": "When you create an account with us, you must provide information that is accurate, complete, and current at all times. You are responsible for safeguarding the password and for all activities that occur under your account."
+      },
+      "privacy": {
+        "title": "Privacy Policy",
+        "content": "Your privacy is important to us. Please review our Privacy Policy, which also governs your use of the service, to understand our practices."
+      },
+      "termination": {
+        "title": "Termination",
+        "content": "We may terminate or suspend your account immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms."
+      },
+      "changes": {
+        "title": "Changes to Terms",
+        "content": "We reserve the right, at our sole discretion, to modify or replace these Terms at any time. If a revision is material, we will try to provide at least 30 days notice prior to any new terms taking effect."
+      },
+      "contact": {
+        "title": "Contact Information",
+        "content": "If you have any questions about these Terms of Service, please contact us."
+      }
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "lastUpdated": "Last updated: {date}",
+      "introduction": "This Privacy Policy describes how we collect, use, and protect your information when you use our service.",
+      "informationCollection": {
+        "title": "Information We Collect",
+        "content": "We collect information you provide directly to us, such as when you create an account, use our services, or contact us for support."
+      },
+      "howWeUse": {
+        "title": "How We Use Your Information",
+        "content": "We use the information we collect to provide, maintain, and improve our services, process transactions, and communicate with you."
+      },
+      "informationSharing": {
+        "title": "Information Sharing",
+        "content": "We do not sell, trade, or otherwise transfer your personal information to third parties without your consent, except as described in this policy."
+      },
+      "dataSecurity": {
+        "title": "Data Security",
+        "content": "We implement appropriate security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction."
+      },
+      "cookies": {
+        "title": "Cookies and Tracking",
+        "content": "We use cookies and similar tracking technologies to enhance your experience and analyze how our service is used."
+      },
+      "yourRights": {
+        "title": "Your Rights",
+        "content": "You have the right to access, update, or delete your personal information. You may also opt out of certain communications from us."
+      },
+      "changes": {
+        "title": "Changes to Privacy Policy",
+        "content": "We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page."
+      },
+      "contact": {
+        "title": "Contact Information",
+        "content": "If you have any questions about this Privacy Policy, please contact us."
+      }
+    }
   },
   "blocks": {
     "title": "Component Library",

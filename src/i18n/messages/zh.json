@@ -59,7 +59,18 @@
     "googleSignUp": "Google注册",
     "signingUp": "注册中...",
     "orContinueWith": "或继续使用",
-    "signUpButton": "注册"
+    "signUpButton": "注册",
+    "noAccount": "还没有账户？",
+    "signUpLink": "注册",
+    "alreadyHaveAccount": "已经有账户了？",
+    "loginLink": "登录",
+    "termsOfService": "服务条款",
+    "privacyPolicy": "隐私政策",
+    "termsAndPrivacy": {
+      "prefix": "点击继续即表示您同意我们的",
+      "middle": "和",
+      "suffix": "。"
+    }
   },
   "dashboard": {
     "title": "仪表板",
@@ -211,6 +222,78 @@
     "author": "作者",
     "publishedOn": "发布于",
     "tags": "标签"
+  },
+  "legal": {
+    "terms": {
+      "title": "服务条款",
+      "lastUpdated": "最后更新：{date}",
+      "introduction": "欢迎使用我们的服务。这些条款和条件概述了使用我们网站和服务的规则和规定。",
+      "acceptance": {
+        "title": "接受条款",
+        "content": "通过访问和使用此服务，您接受并同意受本协议条款和规定的约束。"
+      },
+      "useOfService": {
+        "title": "服务使用",
+        "content": "您只能将我们的服务用于合法目的。您同意不以违反任何适用的联邦、州、地方或国际法律或法规的方式使用服务。"
+      },
+      "userAccounts": {
+        "title": "用户账户",
+        "content": "当您在我们这里创建账户时，您必须提供准确、完整且最新的信息。您有责任保护密码并对您账户下发生的所有活动负责。"
+      },
+      "privacy": {
+        "title": "隐私政策",
+        "content": "您的隐私对我们很重要。请查看我们的隐私政策，该政策也管理您对服务的使用，以了解我们的做法。"
+      },
+      "termination": {
+        "title": "终止",
+        "content": "我们可能会立即终止或暂停您的账户，无需事先通知或承担责任，原因包括但不限于您违反条款。"
+      },
+      "changes": {
+        "title": "条款变更",
+        "content": "我们保留随时修改或替换这些条款的权利。如果修订是重大的，我们将尝试在任何新条款生效前至少提前30天通知。"
+      },
+      "contact": {
+        "title": "联系信息",
+        "content": "如果您对这些服务条款有任何疑问，请联系我们。"
+      }
+    },
+    "privacy": {
+      "title": "隐私政策",
+      "lastUpdated": "最后更新：{date}",
+      "introduction": "本隐私政策描述了当您使用我们的服务时，我们如何收集、使用和保护您的信息。",
+      "informationCollection": {
+        "title": "我们收集的信息",
+        "content": "我们收集您直接提供给我们的信息，例如当您创建账户、使用我们的服务或联系我们寻求支持时。"
+      },
+      "howWeUse": {
+        "title": "我们如何使用您的信息",
+        "content": "我们使用收集的信息来提供、维护和改进我们的服务，处理交易，并与您沟通。"
+      },
+      "informationSharing": {
+        "title": "信息共享",
+        "content": "未经您的同意，我们不会向第三方出售、交易或以其他方式转让您的个人信息，除非本政策中所述。"
+      },
+      "dataSecurity": {
+        "title": "数据安全",
+        "content": "我们实施适当的安全措施来保护您的个人信息免受未经授权的访问、更改、披露或破坏。"
+      },
+      "cookies": {
+        "title": "Cookie和跟踪",
+        "content": "我们使用Cookie和类似的跟踪技术来增强您的体验并分析我们服务的使用情况。"
+      },
+      "yourRights": {
+        "title": "您的权利",
+        "content": "您有权访问、更新或删除您的个人信息。您也可以选择退出我们的某些通信。"
+      },
+      "changes": {
+        "title": "隐私政策变更",
+        "content": "我们可能会不时更新此隐私政策。我们将通过在此页面上发布新的隐私政策来通知您任何更改。"
+      },
+      "contact": {
+        "title": "联系信息",
+        "content": "如果您对此隐私政策有任何疑问，请联系我们。"
+      }
+    }
   },
   "blocks": {
     "title": "组件库",

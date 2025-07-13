@@ -79,7 +79,8 @@ export const i18nConfig: I18nConfig = {
     'security',
     'faq',
     'blog',
-    'blocks'
+    'blocks',
+    'legal'
   ],
 
   // Date and time formats for each locale
