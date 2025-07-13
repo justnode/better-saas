@@ -284,6 +284,38 @@ export interface SidebarItem {
   icon: React.ComponentType<{ className?: string }> | string;
 }
 
+// Navbar configuration types
+export interface NavbarConfig {
+  logo: {
+    url: string;
+    src: string;
+    alt: string;
+    title: string;
+  };
+  auth: {
+    login: {
+      text: string;
+      url: string;
+    };
+    signup: {
+      text: string;
+      url: string;
+    };
+  };
+  menu: {
+    items: NavbarMenuItem[];
+  };
+}
+
+export interface NavbarMenuItem {
+  title: string;
+  url: string;
+  description?: string;
+  icon?: string; // Icon name for config, will be resolved to JSX.Element in component
+  items?: NavbarMenuItem[];
+  onClick?: string; // Function name for special handlers like 'handlePricingClick'
+}
+
 export interface SidebarGroup {
   title: string;
   items: SidebarItem[];

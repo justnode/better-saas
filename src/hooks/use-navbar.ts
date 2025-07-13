@@ -1,29 +1,80 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useAuthInitialized, useAuthLoading, useIsAuthenticated } from '@/store/auth-store';
+import { useNavbarConfig } from '@/hooks/use-config';
+import { Book, Sunset, Trees, Zap } from 'lucide-react';
+import { createElement } from 'react';
 import type { UseNavbarReturn, LogoConfig, AuthConfig, MenuItem } from '@/types/navbar';
+import type { NavbarMenuItem } from '@/types';
+import type { JSX } from 'react';
+
+// Icon mapping function
+const getIconComponent = (iconName?: string): JSX.Element | undefined => {
+  if (!iconName) return undefined;
+
+  const iconProps = { className: "size-5 shrink-0" };
+
+  switch (iconName) {
+    case 'Book':
+      return createElement(Book, iconProps);
+    case 'Sunset':
+      return createElement(Sunset, iconProps);
+    case 'Trees':
+      return createElement(Trees, iconProps);
+    case 'Zap':
+      return createElement(Zap, iconProps);
+    default:
+      return undefined;
+  }
+};
+
+// Convert config menu item to component menu item
+const convertMenuItem = (item: NavbarMenuItem, locale: string, handlePricingClick: () => void): MenuItem => {
+  const baseItem: MenuItem = {
+    title: item.title,
+    url: item.url.startsWith('/') ? `/${locale}${item.url}` : item.url,
+    description: item.description,
+    icon: getIconComponent(item.icon),
+  };
+
+  // Handle special onClick handlers
+  if (item.onClick === 'handlePricingClick') {
+    baseItem.onClick = handlePricingClick;
+  }
+
+  // Convert sub-items recursively
+  if (item.items) {
+    baseItem.items = item.items.map(subItem => convertMenuItem(subItem, locale, handlePricingClick));
+  }
+
+  return baseItem;
+};
 
 export function useNavbar(): UseNavbarReturn {
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as string) || 'en';
-  
+
   const isAuthenticated = useIsAuthenticated();
   const isLoading = useAuthLoading();
   const isInitialized = useAuthInitialized();
 
-  // Logo configuration
-  const logo: LogoConfig = {
-    url: '/',
-    src: '/icons/apple-touch-icon.png',
-    alt: 'logo',
-    title: 'Better SaaS',
-  };
+  // Get navbar configuration
+  const config = useNavbarConfig();
 
-  // Auth configuration
+  // Logo configuration from config
+  const logo: LogoConfig = config.logo;
+
+  // Auth configuration from config with locale prefix
   const auth: AuthConfig = {
-    login: { text: 'Log in', url: '/login' },
-    signup: { text: 'Sign up', url: '/signup' },
+    login: {
+      text: config.auth.login.text,
+      url: `/${locale}${config.auth.login.url}`
+    },
+    signup: {
+      text: config.auth.signup.text,
+      url: `/${locale}${config.auth.signup.url}`
+    },
   };
 
   // Function to smooth scroll to specified element
@@ -52,50 +103,10 @@ export function useNavbar(): UseNavbarReturn {
     }
   };
 
-  // Menu configuration (icons will be created in components)
-  const menu: MenuItem[] = [
-    { title: 'Blog', url: `/${locale}/blog` },
-    {
-      title: 'Document',
-      url: `/${locale}/docs`,
-    },
-    {
-      title: 'Components',
-      url: `/${locale}/blocks`,
-    },
-    {
-      title: 'Pricing',
-      url: `/${locale}#pricing`,
-      onClick: handlePricingClick,
-    },
-    {
-      title: 'Resources',
-      url: '#',
-      items: [
-        {
-          title: 'Help Center',
-          description: 'Get all the answers you need right here',
-          url: '#',
-        },
-        {
-          title: 'Contact Us',
-          description: 'We are here to help you with any questions you have',
-          url: '#',
-        },
-        {
-          title: 'Status',
-          description: 'Check the current status of our services and APIs',
-          url: '#',
-        },
-        {
-          title: 'Terms of Service',
-          description: 'Our terms and conditions for using our services',
-          url: '#',
-        },
-      ],
-    }
-    
-  ];
+  // Menu configuration from config
+  const menu: MenuItem[] = config.menu.items.map(item =>
+    convertMenuItem(item, locale, handlePricingClick)
+  );
 
   return {
     logo,

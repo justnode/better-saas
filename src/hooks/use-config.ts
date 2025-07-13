@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useLocale } from 'next-intl';
-import { appConfig, featuresConfig, i18nConfig, themeConfig, paymentConfig } from '@/config';
+import { appConfig, featuresConfig, i18nConfig, themeConfig, paymentConfig, navbarConfig } from '@/config';
 import type {
   AppConfig,
   FeaturesConfig,
@@ -8,6 +8,7 @@ import type {
   ThemeConfig,
   PaymentConfig,
   PaymentPlan,
+  NavbarConfig,
 } from '@/types';
 
 /**
@@ -43,6 +44,13 @@ export function useThemeConfig(): ThemeConfig {
  */
 export function usePaymentConfig(): PaymentConfig {
   return useMemo(() => paymentConfig, []);
+}
+
+/**
+ * Hook to access navbar configuration
+ */
+export function useNavbarConfig(): NavbarConfig {
+  return useMemo(() => navbarConfig, []);
 }
 
 /**
