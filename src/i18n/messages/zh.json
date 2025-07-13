@@ -95,6 +95,27 @@
     "recentActivity": "最近活动",
     "latestActivity": "您的最新账户活动"
   },
+  "hero": {
+    "heading": "终极可扩展的 Next.js SaaS 模板",
+    "description": "使用我们生产就绪的 Next.js 模板开始您的 SaaS 之旅。大幅缩短开发时间，更快地为客户提供价值。以无与伦比的速度和信心构建、启动和扩展。",
+    "buttonText": "开始使用",
+    "buttonUrl": "/docs",
+    "reviewsText": "来自 {count}+ 条评价",
+    "avatarAlt": "头像 {index}"
+  },
+  "pricing": {
+    "heading": "选择您的套餐",
+    "description": "选择最适合您需求的套餐。随时升级或降级。",
+    "monthly": "月付",
+    "yearly": "年付",
+    "processingText": "处理中...",
+    "getStartedText": "开始使用",
+    "purchaseText": "购买"
+  },
+  "techstack": {
+    "heading": "采用现代化技术栈构建",
+    "description": "使用最新的技术栈构建您的SaaS应用程序"
+  },
   "faq": {
     "heading": "常见问题",
     "description": "在这里找到我们产品的常见问题答案。找不到您要找的内容？联系我们的客服团队。",

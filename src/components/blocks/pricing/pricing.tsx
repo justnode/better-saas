@@ -2,6 +2,7 @@
 
 import { ArrowRight, CircleCheck } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,10 +47,15 @@ interface Pricing2Props {
 }
 
 const Pricing = ({
-  heading = 'Pricing',
-  description = 'Check out our affordable pricing plans',
+  heading,
+  description,
   plans,
 }: Pricing2Props) => {
+  const t = useTranslations('pricing');
+
+  // 使用i18n翻译或传入的props
+  const finalHeading = heading || t('heading');
+  const finalDescription = description || t('description');
   const [isYearly, setIsYearly] = useState(false);
   const [isPending, startTransition] = useTransition();
   const isAuthenticated = useIsAuthenticated();
@@ -69,7 +75,9 @@ const Pricing = ({
       yearly: plan.stripePriceId,
     },
     button: {
-      text: plan.price === 0 ? 'Get Started' : 'Purchase',
+      text: plan.price === 0
+        ? t('getStartedText')
+        : t('purchaseText'),
     },
   }));
 
@@ -126,12 +134,12 @@ const Pricing = ({
     <section id="pricing" className="py-16">
       <div className="container">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-6 text-center">
-          <h2 className="text-pretty font-bold text-4xl lg:text-6xl">{heading}</h2>
-          <p className="text-muted-foreground lg:text-xl">{description}</p>
+          <h2 className="text-pretty font-bold text-4xl lg:text-6xl">{finalHeading}</h2>
+          <p className="text-muted-foreground lg:text-xl">{finalDescription}</p>
           <div className="flex items-center gap-3 text-lg">
-            Monthly
+            {t('monthly')}
             <Switch checked={isYearly} onCheckedChange={() => setIsYearly(!isYearly)} />
-            Yearly
+            {t('yearly')}
           </div>
           <div className="flex flex-col items-stretch gap-6 md:flex-row">
             {pricingPlans.map((plan: PricingPlan) => (
@@ -177,7 +185,7 @@ const Pricing = ({
                     onClick={() => handlePurchaseClick(plan)}
                     disabled={isPending}
                   >
-                    {isPending ? '处理中...' : plan.button.text}
+                    {isPending ? t('processingText') : plan.button.text}
                     <ArrowRight className="ml-2 size-4" />
                   </Button>
                 </CardFooter>

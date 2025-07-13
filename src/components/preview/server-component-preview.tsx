@@ -24,17 +24,7 @@ export function ServerComponentPreview({ componentId, name, code }: ServerCompon
       case 'pricing2':
         return <Pricing />;
       case 'faq3':
-        return (
-          <Faq
-            heading="常见问题"
-            description="以下是一些常见问题的答案"
-            items={[]}
-            supportHeading="还有其他问题？"
-            supportDescription="联系我们的支持团队"
-            supportButtonText="联系支持"
-            supportButtonUrl="/contact"
-          />
-        );
+        return <Faq />;
       case 'footer-7':
         return <Footer />;
       default:

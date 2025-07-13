@@ -95,6 +95,27 @@
     "recentActivity": "Recent Activity",
     "latestActivity": "Your latest account activity"
   },
+  "hero": {
+    "heading": "The Ultimate Scalable Next.js SaaS Boilerplate",
+    "description": "Start your SaaS journey with our production-ready Next.js boilerplate. Slash development time and deliver value to your customers faster. Build, launch, and scale with unmatched speed and confidence.",
+    "buttonText": "Get Started",
+    "buttonUrl": "/docs",
+    "reviewsText": "from {count}+ reviews",
+    "avatarAlt": "Avatar {index}"
+  },
+  "pricing": {
+    "heading": "Choose Your Plan",
+    "description": "Select the perfect plan for your needs. Upgrade or downgrade at any time.",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "processingText": "Processing...",
+    "getStartedText": "Get Started",
+    "purchaseText": "Purchase"
+  },
+  "techstack": {
+    "heading": "Build With Modern Stack",
+    "description": "Build your SaaS application with the latest technology stack"
+  },
   "faq": {
     "heading": "Frequently asked questions",
     "description": "Find answers to common questions about our products. Can't find what you're looking for? Contact our support team.",

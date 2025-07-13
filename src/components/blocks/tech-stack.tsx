@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 interface TechStackProps {
   heading?: string;
   description?: string;
@@ -6,9 +8,8 @@ interface TechStackProps {
 
 const TechStack = ({
   heading = 'Build With Modern Stack',
-  description = 'Build a SaaS fast with built-in Authentication, Multi-Tenancy, Settings, Stripe Payments, Blogging, Documentation and Marketing pages.',
-  badge = 'Ship Better',
 }: TechStackProps) => {
+  const t = useTranslations('techstack');
   const techLogos = [
     {
       name: 'Next.js',
@@ -194,7 +195,7 @@ const TechStack = ({
     <section className="bg-gradient-to-b from-background to-muted/20 py-24">
       <div className="container mx-auto px-4">
         <div className="text-center">
-          <p className="mb-4">{heading}</p>
+          <p className="mb-4">{t('heading')}</p>
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-8 transition-opacity duration-500 md:gap-12 lg:gap-16">
