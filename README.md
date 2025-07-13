@@ -128,7 +128,7 @@ src/
 3. **Set up environment variables**
 
    ```bash
-   cp env.example .env.local
+   cp env.example .env
    ```
 
    Fill in the required environment variables:
@@ -150,19 +150,14 @@ src/
    pnpm db:push
    ```
 
-5. **Set up admin user (optional)**
-
-   ```bash
-   pnpm admin:setup
-   ```
-
-6. **Start the development server**
+5. **Start the development server**
 
    ```bash
    pnpm dev
    ```
 
    Open [http://localhost:3000](http://localhost:3000) in your browser.
+
 
 ## 📋 Available Scripts
 

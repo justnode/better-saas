@@ -1,18 +1,14 @@
 import { useMemo } from 'react';
 import { useLocale } from 'next-intl';
-import { 
-  appConfig, 
-  featuresConfig, 
-  i18nConfig, 
-  themeConfig, 
-  paymentConfig,
-  type AppConfig,
-  type FeaturesConfig,
-  type I18nConfig,
-  type ThemeConfig,
-  type PaymentConfig
-} from '../config';
-import type { PaymentPlan } from '../config/payment.config';
+import { appConfig, featuresConfig, i18nConfig, themeConfig, paymentConfig } from '@/config';
+import type {
+  AppConfig,
+  FeaturesConfig,
+  I18nConfig,
+  ThemeConfig,
+  PaymentConfig,
+  PaymentPlan,
+} from '@/types';
 
 /**
  * Hook to access application configuration
@@ -55,12 +51,12 @@ export function usePaymentConfig(): PaymentConfig {
 export function useCurrentLocaleConfig() {
   const locale = useLocale();
   const config = useI18nConfig();
-  
+
   return useMemo(() => {
     const language = config.languages[locale];
     const dateTimeFormat = config.dateTimeFormats[locale];
     const numberFormat = config.numberFormats[locale];
-    
+
     return {
       locale,
       language,
@@ -77,11 +73,11 @@ export function useCurrentLocaleConfig() {
  */
 export function useFeatureFlag(feature: string): boolean {
   const config = useFeaturesConfig();
-  
+
   return useMemo(() => {
     const keys = feature.split('.');
     let current: unknown = config;
-    
+
     for (const key of keys) {
       if (current && typeof current === 'object' && key in current) {
         current = (current as Record<string, unknown>)[key];
@@ -89,7 +85,7 @@ export function useFeatureFlag(feature: string): boolean {
         return false;
       }
     }
-    
+
     return Boolean(current);
   }, [feature, config]);
 }
@@ -99,12 +95,12 @@ export function useFeatureFlag(feature: string): boolean {
  */
 export function usePaymentPlans() {
   const config = usePaymentConfig();
-  
+
   return useMemo(() => {
     return config.plans.filter((plan: PaymentPlan) => {
       // Always include free plan
       if (plan.id === 'free') return true;
-      
+
       // Check if payment features are enabled
       return config.features.subscriptions || config.features.oneTimePayments;
     });
@@ -116,7 +112,7 @@ export function usePaymentPlans() {
  */
 export function usePaymentPlan(planId: string) {
   const config = usePaymentConfig();
-  
+
   return useMemo(() => {
     return config.plans.find((plan: PaymentPlan) => plan.id === planId);
   }, [planId, config]);
@@ -127,7 +123,7 @@ export function usePaymentPlan(planId: string) {
  */
 export function useThemeColors() {
   const config = useThemeConfig();
-  
+
   return useMemo(() => config.colors, [config]);
 }
 
@@ -136,7 +132,7 @@ export function useThemeColors() {
  */
 export function useBreakpoints() {
   const config = useThemeConfig();
-  
+
   return useMemo(() => config.breakpoints, [config]);
 }
 
@@ -146,11 +142,14 @@ export function useBreakpoints() {
 export function useAdminConfig() {
   const appConf = useAppConfig();
   const featuresConf = useFeaturesConfig();
-  
-  return useMemo(() => ({
-    emails: appConf.admin.emails,
-    features: featuresConf.admin,
-  }), [appConf, featuresConf]);
+
+  return useMemo(
+    () => ({
+      emails: appConf.admin.emails,
+      features: featuresConf.admin,
+    }),
+    [appConf, featuresConf]
+  );
 }
 
 /**
@@ -158,7 +157,7 @@ export function useAdminConfig() {
  */
 export function useIsAdmin(userEmail?: string | null): boolean {
   const { emails } = useAdminConfig();
-  
+
   return useMemo(() => {
     if (!userEmail || emails.length === 0) return false;
     return emails.includes(userEmail);
@@ -171,11 +170,14 @@ export function useIsAdmin(userEmail?: string | null): boolean {
 export function useUploadConfig() {
   const appConf = useAppConfig();
   const featuresConf = useFeaturesConfig();
-  
-  return useMemo(() => ({
-    ...appConf.upload,
-    ...featuresConf.fileManager,
-  }), [appConf, featuresConf]);
+
+  return useMemo(
+    () => ({
+      ...appConf.upload,
+      ...featuresConf.fileManager,
+    }),
+    [appConf, featuresConf]
+  );
 }
 
 /**
@@ -183,7 +185,7 @@ export function useUploadConfig() {
  */
 export function usePaginationConfig() {
   const config = useAppConfig();
-  
+
   return useMemo(() => config.pagination, [config]);
 }
 
@@ -192,7 +194,7 @@ export function usePaginationConfig() {
  */
 export function useMetadataConfig() {
   const config = useAppConfig();
-  
+
   return useMemo(() => config.metadata, [config]);
 }
 
@@ -201,7 +203,7 @@ export function useMetadataConfig() {
  */
 export function useEnabledLanguages() {
   const config = useI18nConfig();
-  
+
   return useMemo(() => {
     return config.locales
       .filter((locale: string) => config.languages[locale]?.enabled)
@@ -217,14 +219,14 @@ export function useEnabledLanguages() {
  */
 export function useCurrencyFormatter() {
   const { locale, numberFormat } = useCurrentLocaleConfig();
-  
+
   return useMemo(() => {
     return (amount: number, currency?: string) => {
       const formatOptions = {
         ...numberFormat?.currency,
         ...(currency && { currency }),
       };
-      
+
       return new Intl.NumberFormat(locale, formatOptions).format(amount);
     };
   }, [locale, numberFormat]);
@@ -235,7 +237,7 @@ export function useCurrencyFormatter() {
  */
 export function useDateFormatter() {
   const { locale, dateTimeFormat } = useCurrentLocaleConfig();
-  
+
   return useMemo(() => {
     return {
       short: (date: Date) => new Intl.DateTimeFormat(locale, dateTimeFormat?.short).format(date),
@@ -243,4 +245,4 @@ export function useDateFormatter() {
       long: (date: Date) => new Intl.DateTimeFormat(locale, dateTimeFormat?.long).format(date),
     };
   }, [locale, dateTimeFormat]);
-} 
+}

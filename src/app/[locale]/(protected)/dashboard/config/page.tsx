@@ -11,13 +11,13 @@ import {
   usePaymentConfig,
 } from '@/hooks/use-config';
 import { Settings, Palette, Globe, CreditCard, Zap, Shield } from 'lucide-react';
-import type { PaymentPlan } from '@/config/payment.config';
+import type { PaymentPlan } from '@/types'; 
 
 export default function ConfigPage() {
   const appConfig = useAppConfig();
   const featuresConfig = useFeaturesConfig();
   const i18nConfig = useI18nConfig();
-  const themeConfig = useThemeConfig();
+  const themeConfig = useThemeConfig(); 
   const paymentConfig = usePaymentConfig();
 
   return (
