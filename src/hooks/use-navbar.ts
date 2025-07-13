@@ -4,6 +4,7 @@ import { useAuthInitialized, useAuthLoading, useIsAuthenticated } from '@/store/
 import { useNavbarConfig } from '@/hooks/use-config';
 import { Book, Sunset, Trees, Zap } from 'lucide-react';
 import { createElement } from 'react';
+import { useTranslations } from 'next-intl';
 import type { UseNavbarReturn, LogoConfig, AuthConfig, MenuItem } from '@/types/navbar';
 import type { NavbarMenuItem } from '@/types';
 import type { JSX } from 'react';
@@ -28,32 +29,25 @@ const getIconComponent = (iconName?: string): JSX.Element | undefined => {
   }
 };
 
-// Convert config menu item to component menu item
-const convertMenuItem = (item: NavbarMenuItem, locale: string, handlePricingClick: () => void): MenuItem => {
-  const baseItem: MenuItem = {
-    title: item.title,
-    url: item.url.startsWith('/') ? `/${locale}${item.url}` : item.url,
-    description: item.description,
+// Translation helper function
+const translateMenuItem = (item: NavbarMenuItem, t: (key: string) => string, locale: string): MenuItem => {
+  return {
+    title: t(item.title),
+    url: item.url.startsWith('#') ? item.url : `/${locale}${item.url}`,
+    description: item.description ? t(item.description) : undefined,
     icon: getIconComponent(item.icon),
+    items: item.items?.map(subItem => translateMenuItem(subItem, t, locale)),
+    onClick: item.onClick ? () => {} : undefined, // Will be handled in component
   };
-
-  // Handle special onClick handlers
-  if (item.onClick === 'handlePricingClick') {
-    baseItem.onClick = handlePricingClick;
-  }
-
-  // Convert sub-items recursively
-  if (item.items) {
-    baseItem.items = item.items.map(subItem => convertMenuItem(subItem, locale, handlePricingClick));
-  }
-
-  return baseItem;
 };
+
+
 
 export function useNavbar(): UseNavbarReturn {
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as string) || 'en';
+  const t = useTranslations('navbar');
 
   const isAuthenticated = useIsAuthenticated();
   const isLoading = useAuthLoading();
@@ -62,17 +56,22 @@ export function useNavbar(): UseNavbarReturn {
   // Get navbar configuration
   const config = useNavbarConfig();
 
-  // Logo configuration from config
-  const logo: LogoConfig = config.logo;
+  // Logo configuration with i18n
+  const logo: LogoConfig = {
+    url: config.logo.url,
+    src: config.logo.src,
+    alt: t(config.logo.alt),
+    title: t(config.logo.title),
+  };
 
-  // Auth configuration from config with locale prefix
+  // Auth configuration with i18n and locale prefix
   const auth: AuthConfig = {
     login: {
-      text: config.auth.login.text,
+      text: t(config.auth.login.text),
       url: `/${locale}${config.auth.login.url}`
     },
     signup: {
-      text: config.auth.signup.text,
+      text: t(config.auth.signup.text),
       url: `/${locale}${config.auth.signup.url}`
     },
   };
@@ -103,10 +102,17 @@ export function useNavbar(): UseNavbarReturn {
     }
   };
 
-  // Menu configuration from config
-  const menu: MenuItem[] = config.menu.items.map(item =>
-    convertMenuItem(item, locale, handlePricingClick)
-  );
+  // Menu configuration with i18n
+  const menu: MenuItem[] = config.menu.items.map(item => {
+    const translatedItem = translateMenuItem(item, t, locale);
+
+    // Handle special onClick handlers
+    if (item.onClick === 'handlePricingClick') {
+      translatedItem.onClick = handlePricingClick;
+    }
+
+    return translatedItem;
+  });
 
   return {
     logo,

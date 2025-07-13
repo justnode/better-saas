@@ -119,35 +119,8 @@ const Navbar = ({
   isInitialized,
   onPricingClick,
 }: NavbarProps) => {
-                  // Add icon for Resources menu item
-  const menuWithIcons: MenuItem[] = menu.map(item => {
-    if (item.title === 'Resources' && item.items) {
-      return {
-        ...item,
-        items: item.items.map(subItem => {
-          let icon: JSX.Element | undefined;
-          switch (subItem.title) {
-            case 'Help Center':
-              icon = <Zap className="size-5 shrink-0" />;
-              break;
-            case 'Contact Us':
-              icon = <Sunset className="size-5 shrink-0" />;
-              break;
-            case 'Status':
-              icon = <Trees className="size-5 shrink-0" />;
-              break;
-            case 'Terms of Service':
-              icon = <Book className="size-5 shrink-0" />;
-              break;
-            default:
-              icon = undefined;
-          }
-          return { ...subItem, icon };
-        })
-      };
-    }
-    return item;
-  });
+  // Menu items are already processed with icons in useNavbar hook
+  const menuWithIcons: MenuItem[] = menu;
 
   const menuItems = menuWithIcons;
 
@@ -192,7 +165,7 @@ const Navbar = ({
               if (item.onClick) {
                 e.preventDefault();
                 item.onClick();
-              } else if (item.title === 'Pricing') {
+              } else if (item.url === '#pricing') {
                 e.preventDefault();
                 onPricingClick();
               }
@@ -243,7 +216,7 @@ const Navbar = ({
             if (item.onClick) {
               e.preventDefault();
               item.onClick();
-            } else if (item.title === 'Pricing') {
+            } else if (item.url === '#pricing') {
               e.preventDefault();
               onPricingClick();
             }

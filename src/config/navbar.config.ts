@@ -5,67 +5,67 @@ export const navbarConfig: NavbarConfig = {
   logo: {
     url: '/',
     src: '/icons/apple-touch-icon.png',
-    alt: 'logo',
-    title: 'Better SaaS',
+    alt: 'logo.alt', // i18n key (navbar. prefix will be added by useTranslations)
+    title: 'logo.title', // i18n key
   },
 
   // Authentication configuration
   auth: {
-    login: { 
-      text: 'Log in', 
-      url: '/login' 
+    login: {
+      text: 'auth.login', // i18n key
+      url: '/login'
     },
-    signup: { 
-      text: 'Sign up', 
-      url: '/signup' 
+    signup: {
+      text: 'auth.signup', // i18n key
+      url: '/signup'
     },
   },
 
   // Menu configuration
   menu: {
     items: [
-      { 
-        title: 'Blog', 
+      {
+        title: 'menu.blog', // i18n key
         url: '/blog' // Will be prefixed with locale in hook
       },
       {
-        title: 'Document',
+        title: 'menu.document', // i18n key
         url: '/docs',
       },
       {
-        title: 'Components',
+        title: 'menu.components', // i18n key
         url: '/blocks',
       },
       {
-        title: 'Pricing',
+        title: 'menu.pricing', // i18n key
         url: '#pricing',
         onClick: 'handlePricingClick', // Special handler
       },
       {
-        title: 'Resources',
+        title: 'menu.resources', // i18n key
         url: '#',
         items: [
           {
-            title: 'Help Center',
-            description: 'Get all the answers you need right here',
+            title: 'menu.helpCenter', // i18n key
+            description: 'menu.helpCenterDescription', // i18n key
             url: '#',
             icon: 'Zap',
           },
           {
-            title: 'Contact Us',
-            description: 'We are here to help you with any questions you have',
+            title: 'menu.contactUs', // i18n key
+            description: 'menu.contactUsDescription', // i18n key
             url: '#',
             icon: 'Sunset',
           },
           {
-            title: 'Status',
-            description: 'Check the current status of our services and APIs',
+            title: 'menu.status', // i18n key
+            description: 'menu.statusDescription', // i18n key
             url: '#',
             icon: 'Trees',
           },
           {
-            title: 'Terms of Service',
-            description: 'Our terms and conditions for using our services',
+            title: 'menu.termsOfService', // i18n key
+            description: 'menu.termsOfServiceDescription', // i18n key
             url: '#',
             icon: 'Book',
           },

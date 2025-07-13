@@ -163,6 +163,31 @@
     "billing": "账单",
     "security": "安全"
   },
+  "navbar": {
+    "logo": {
+      "title": "Better SaaS",
+      "alt": "logo"
+    },
+    "menu": {
+      "blog": "博客",
+      "document": "文档",
+      "components": "组件",
+      "pricing": "定价",
+      "resources": "资源",
+      "helpCenter": "帮助中心",
+      "helpCenterDescription": "获取帮助和支持",
+      "contactUs": "联系我们",
+      "contactUsDescription": "与我们的团队取得联系",
+      "status": "状态",
+      "statusDescription": "查看系统状态",
+      "termsOfService": "服务条款",
+      "termsOfServiceDescription": "阅读我们的条款和条件"
+    },
+    "auth": {
+      "login": "登录",
+      "signup": "注册"
+    }
+  },
   "userMenu": {
     "user": "用户",
     "security": "安全",

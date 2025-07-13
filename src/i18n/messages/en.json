@@ -163,6 +163,31 @@
     "billing": "Billing",
     "security": "Security"
   },
+  "navbar": {
+    "logo": {
+      "title": "Better SaaS",
+      "alt": "logo"
+    },
+    "menu": {
+      "blog": "Blog",
+      "document": "Document",
+      "components": "Components",
+      "pricing": "Pricing",
+      "resources": "Resources",
+      "helpCenter": "Help Center",
+      "helpCenterDescription": "Get help and support",
+      "contactUs": "Contact Us",
+      "contactUsDescription": "Get in touch with our team",
+      "status": "Status",
+      "statusDescription": "Check system status",
+      "termsOfService": "Terms of Service",
+      "termsOfServiceDescription": "Read our terms and conditions"
+    },
+    "auth": {
+      "login": "Log in",
+      "signup": "Sign up"
+    }
+  },
   "userMenu": {
     "user": "User",
     "security": "Security",

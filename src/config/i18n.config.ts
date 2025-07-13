@@ -46,6 +46,7 @@ export const i18nConfig: I18nConfig = {
     'dashboard',
     'toast',
     'sidebar',
+    'navbar',
     'userMenu',
     'settings',
     'profile',
