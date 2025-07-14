@@ -110,7 +110,17 @@
     "yearly": "Yearly",
     "processingText": "Processing...",
     "getStartedText": "Get Started",
-    "purchaseText": "Purchase"
+    "purchaseText": "Purchase",
+    "purchaseDialog": {
+      "title": "Test Payment Notice",
+      "description": "better-saas is an open-source and free software. Please use the test card number 5555555555554444 for payment testing. Do not make real payments.",
+      "testCardNumber": "Test Card Number: 5555555555554444",
+      "warning": "⚠️ This is for testing purposes only",
+      "continueButton": "Continue to Payment",
+      "cancelButton": "Cancel",
+      "purchaseInfo": "You are about to purchase: {planName}",
+      "processing": "Processing..."
+    }
   },
   "techstack": {
     "heading": "Build With Modern Stack",

@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useTransition } from 'react';
 import { ErrorLogger } from '@/lib/logger/logger-utils';
 import { usePaymentPlans } from '@/hooks/use-config';
+import { PurchaseConfirmationDialog } from '@/components/payment/purchase-confirmation-dialog';
 
 const pricingErrorLogger = new ErrorLogger('pricing');
 
@@ -58,6 +59,8 @@ const Pricing = ({
   const finalDescription = description || t('description');
   const [isYearly, setIsYearly] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [showPurchaseDialog, setShowPurchaseDialog] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
   const isAuthenticated = useIsAuthenticated();
   const router = useRouter();
   const paymentPlans = usePaymentPlans();
@@ -94,13 +97,22 @@ const Pricing = ({
       return;
     }
 
+    // For paid plans, show confirmation dialog first
+    setSelectedPlan(plan);
+    setShowPurchaseDialog(true);
+  };
+
+  const handleConfirmPurchase = () => {
+    if (!selectedPlan) return;
+
     // Get corresponding price ID
     const priceId = isYearly 
-      ? plan.stripePriceIds?.yearly 
-      : plan.stripePriceIds?.monthly;
+      ? selectedPlan.stripePriceIds?.yearly 
+      : selectedPlan.stripePriceIds?.monthly;
 
     if (!priceId) {
       toast.error('价格配置错误，请联系客服');
+      setShowPurchaseDialog(false);
       return;
     }
 
@@ -118,16 +130,23 @@ const Pricing = ({
           window.location.href = result.data.url;
         } else {
           toast.error(result.error || '创建支付会话失败');
+          setShowPurchaseDialog(false);
         }
       } catch (error) {
         toast.error('创建支付会话失败');
         pricingErrorLogger.logError(error as Error, {
           operation: 'createCheckoutSession',
           priceId,
-          planId: plan.id,
+          planId: selectedPlan.id,
         });
+        setShowPurchaseDialog(false);
       }
     });
+  };
+
+  const handleCancelPurchase = () => {
+    setShowPurchaseDialog(false);
+    setSelectedPlan(null);
   };
 
   return (
@@ -194,6 +213,15 @@ const Pricing = ({
           </div>
         </div>
       </div>
+
+      {/* Purchase Confirmation Dialog */}
+      <PurchaseConfirmationDialog
+        isOpen={showPurchaseDialog}
+        onClose={handleCancelPurchase}
+        onConfirm={handleConfirmPurchase}
+        planName={selectedPlan?.name}
+        isProcessing={isPending}
+      />
     </section>
   );
 };

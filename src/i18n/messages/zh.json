@@ -110,7 +110,17 @@
     "yearly": "年付",
     "processingText": "处理中...",
     "getStartedText": "开始使用",
-    "purchaseText": "购买"
+    "purchaseText": "购买",
+    "purchaseDialog": {
+      "title": "测试支付提醒",
+      "description": "better-saas是开源免费的软件，请使用测试卡号5555555555554444进行支付，切勿真实付款。",
+      "testCardNumber": "测试卡号：5555555555554444",
+      "warning": "⚠️ 此为测试用途，请勿真实付款",
+      "continueButton": "继续支付",
+      "cancelButton": "取消",
+      "purchaseInfo": "您即将购买：{planName}",
+      "processing": "处理中..."
+    }
   },
   "techstack": {
     "heading": "采用现代化技术栈构建",
