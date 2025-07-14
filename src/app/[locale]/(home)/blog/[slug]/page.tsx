@@ -2,7 +2,7 @@ import { getMDXComponents } from '@/components/mdx-components';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { formatDate, getBlogPost, getBlogPosts } from '@/lib/fumadoc/blog';
+import { formatDate, getBlogPost, getBlogPosts } from '@/lib/fumadocs/blog';
 import { ArrowLeftIcon, CalendarIcon, ClockIcon, UserIcon } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';

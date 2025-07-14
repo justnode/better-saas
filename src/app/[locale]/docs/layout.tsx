@@ -1,5 +1,5 @@
 import { locales } from '@/i18n/routing';
-import { getDocsPages } from '@/lib/fumadoc/docs';
+import { getDocsPages } from '@/lib/fumadocs/docs';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import { RootProvider } from 'fumadocs-ui/provider';
 import { getMessages } from 'next-intl/server';

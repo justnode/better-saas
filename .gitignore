@@ -58,3 +58,4 @@ yarn-error.log*
 /.swc
 /docs/
 
+/.cursor

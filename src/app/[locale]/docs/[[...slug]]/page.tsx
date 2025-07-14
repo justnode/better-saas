@@ -1,6 +1,6 @@
 import { getMDXComponents } from '@/components/mdx-components';
 import { routing } from '@/i18n/routing';
-import { getDocsPage, getDocsPages } from '@/lib/fumadoc/docs';
+import { getDocsPage, getDocsPages } from '@/lib/fumadocs/docs';
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page';
 import { notFound } from 'next/navigation';
 

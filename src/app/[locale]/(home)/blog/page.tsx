@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatDate, getBlogPosts } from '@/lib/fumadoc/blog';
+import { formatDate, getBlogPosts } from '@/lib/fumadocs/blog';
 import { CalendarIcon, ClockIcon, UserIcon } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
