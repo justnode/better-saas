@@ -138,7 +138,6 @@ src/
    - `GITHUB_CLIENT_ID` & `GITHUB_CLIENT_SECRET`: GitHub OAuth app credentials
    - `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET`: Google OAuth app credentials
    - `STRIPE_SECRET_KEY` & `STRIPE_WEBHOOK_SECRET`: Stripe API keys
-   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: Stripe publishable key
    - `NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY` & `NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY`: Stripe price IDs
    - `R2_*`: Cloudflare R2 or AWS S3 configuration
    - `NEXT_PUBLIC_APP_URL`: Your app's URL

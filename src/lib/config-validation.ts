@@ -180,7 +180,6 @@ export const paymentConfigSchema = z.object({
   provider: z.literal('stripe'),
   currency: z.string().length(3, 'Currency must be 3 characters'),
   stripe: z.object({
-    publishableKey: z.string().min(1, 'Stripe publishable key is required'),
     secretKey: z.string().min(1, 'Stripe secret key is required'),
     webhookSecret: z.string().min(1, 'Stripe webhook secret is required'),
     apiVersion: z.string().min(1, 'Stripe API version is required'),
@@ -330,7 +329,7 @@ export function validateEnvironmentConfig() {
   }
 
   // Validate payment-specific env vars if payment is enabled
-  if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+  if (process.env.STRIPE_SECRET_KEY) {
     const stripeVars = [
       'STRIPE_SECRET_KEY',
       'STRIPE_WEBHOOK_SECRET',

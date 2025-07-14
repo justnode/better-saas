@@ -52,7 +52,9 @@ const mockThemeConfig = {
 
 const mockPaymentConfig = {
   stripe: {
-    publishableKey: 'pk_test_123',
+    secretKey: 'sk_test_123',
+    webhookSecret: 'whsec_test_123',
+    apiVersion: '2025-06-30.basil',
   },
   plans: [
     {
@@ -246,7 +248,9 @@ describe('Config Hooks Tests', () => {
       const { result } = renderHook(() => usePaymentConfig());
 
       expect(result.current.stripe).toBeDefined();
-      expect(result.current.stripe.publishableKey).toBe('pk_test_123');
+      expect(result.current.stripe.secretKey).toBe('sk_test_123');
+      expect(result.current.stripe.webhookSecret).toBe('whsec_test_123');
+      expect(result.current.stripe.apiVersion).toBe('2025-06-30.basil');
     });
 
     it('should include payment plans', () => {

@@ -247,7 +247,6 @@ export interface PaymentConfig {
   provider: 'stripe';
   currency: string;
   stripe: {
-    publishableKey: string;
     secretKey: string;
     webhookSecret: string;
     apiVersion: string;
