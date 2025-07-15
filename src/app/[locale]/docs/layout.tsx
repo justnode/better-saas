@@ -1,5 +1,5 @@
 import { locales } from '@/i18n/routing';
-import { getDocsPages } from '@/lib/fumadocs/docs';
+import { buildDocsTree } from '@/lib/fumadocs/docs';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import { RootProvider } from 'fumadocs-ui/provider';
 import { getMessages } from 'next-intl/server';
@@ -15,8 +15,8 @@ export default async function Layout({ children, params }: Props) {
   const { locale } = await params;
   const messages = await getMessages();
 
-  // Get pages in the correct order using our custom function
-  const pages = getDocsPages(locale);
+  // Get the nested tree structure
+  const treeItems = buildDocsTree(locale);
 
   // Helper function to generate correct URL based on locale prefix setting
   const getLocalizedUrl = (path: string) => {
@@ -28,28 +28,29 @@ export default async function Layout({ children, params }: Props) {
     return `/${locale}${path}`;
   };
 
-  const tree = {
-    name: 'Documentation',
-    children: pages.map((page) => {
-      // For index pages, use the base docs URL
-      if (page.file.name === 'index') {
-        const url = getLocalizedUrl('/docs');
+  // Convert tree items to fumadocs format recursively
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const convertTreeItems = (items: typeof treeItems): any[] => {
+    return items.map((item) => {
+      if (item.type === 'folder') {
         return {
-          type: 'page' as const,
-          name: page.data.title,
-          url,
+          type: 'folder',
+          name: item.name,
+          defaultOpen: item.defaultOpen,
+          children: item.children ? convertTreeItems(item.children) : []
         };
       }
-      
-      // For other pages, use the full URL
-      const pageSlug = page.slugs[page.slugs.length - 1];
-      const url = getLocalizedUrl(`/docs/${pageSlug}`);
       return {
-        type: 'page' as const,
-        name: page.data.title,
-        url,
+        type: 'page',
+        name: item.name,
+        url: getLocalizedUrl(item.url || '')
       };
-    }),
+    });
+  };
+
+  const tree = {
+    name: 'Documentation',
+    children: convertTreeItems(treeItems)
   };
 
   const navUrl = getLocalizedUrl('/docs');

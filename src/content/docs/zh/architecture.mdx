@@ -349,25 +349,6 @@ CREATE TABLE payments (
 
 ## 测试架构
 
-### 测试金字塔
-
-<svg viewBox="0 0 400 300" className="w-full h-auto border rounded-lg bg-white dark:bg-gray-900">
-  {/* E2E Tests */}
-  <polygon points="200,50 120,120 280,120" fill="none" stroke="currentColor" strokeWidth="2" />
-  <text x="200" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">E2E 测试</text>
-  <text x="200" y="95" textAnchor="middle" className="text-xs fill-current">(Playwright)</text>
-  
-  {/* Integration Tests */}
-  <polygon points="200,120 100,180 300,180" fill="none" stroke="currentColor" strokeWidth="2" />
-  <text x="200" y="140" textAnchor="middle" className="text-sm font-semibold fill-current">集成测试</text>
-  <text x="200" y="160" textAnchor="middle" className="text-xs fill-current">(API + 数据库)</text>
-  
-  {/* Unit Tests */}
-  <polygon points="200,180 80,240 320,240" fill="none" stroke="currentColor" strokeWidth="2" />
-  <text x="200" y="205" textAnchor="middle" className="text-sm font-semibold fill-current">单元测试</text>
-  <text x="200" y="225" textAnchor="middle" className="text-xs fill-current">(组件 + 工具)</text>
-</svg>
-
 ### 测试结构
 - **单元测试**: 组件逻辑和工具函数
 - **集成测试**: API 端点和数据库操作

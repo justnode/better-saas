@@ -349,25 +349,6 @@ CREATE TABLE payments (
 
 ## Testing Architecture
 
-### Testing Pyramid
-
-<svg viewBox="0 0 400 300" className="w-full h-auto border rounded-lg bg-white dark:bg-gray-900">
-  {/* E2E Tests */}
-  <polygon points="200,50 120,120 280,120" fill="none" stroke="currentColor" strokeWidth="2" />
-  <text x="200" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">E2E Tests</text>
-  <text x="200" y="95" textAnchor="middle" className="text-xs fill-current">(Playwright)</text>
-  
-  {/* Integration Tests */}
-  <polygon points="200,120 100,180 300,180" fill="none" stroke="currentColor" strokeWidth="2" />
-  <text x="200" y="140" textAnchor="middle" className="text-sm font-semibold fill-current">Integration Tests</text>
-  <text x="200" y="160" textAnchor="middle" className="text-xs fill-current">(API + Database)</text>
-  
-  {/* Unit Tests */}
-  <polygon points="200,180 80,240 320,240" fill="none" stroke="currentColor" strokeWidth="2" />
-  <text x="200" y="205" textAnchor="middle" className="text-sm font-semibold fill-current">Unit Tests</text>
-  <text x="200" y="225" textAnchor="middle" className="text-xs fill-current">(Components + Utils)</text>
-</svg>
-
 ### Test Structure
 - **Unit Tests**: Component logic and utility functions
 - **Integration Tests**: API endpoints and database operations
