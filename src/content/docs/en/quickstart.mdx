@@ -1,0 +1,156 @@
+---
+title: Quick Start
+---
+
+## Introduction
+
+Get your Better SaaS project up and running in minutes. This guide will walk you through the complete setup process from installation to running your first SaaS application.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+
+- **Node.js 18+** - [Download Node.js](https://nodejs.org/)
+- **pnpm** - Package manager (`npm install -g pnpm`)
+- **PostgreSQL** - Database server
+- **Git** - Version control system
+
+### Optional Services
+
+For full functionality, you'll also need:
+
+- **Stripe Account** - For payment processing
+- **AWS S3 or Cloudflare R2** - For file storage
+- **GitHub/Google OAuth Apps** - For social authentication
+
+## Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone <repository-url>
+cd better-saas
+```
+
+### 2. Install Dependencies
+
+```bash
+pnpm install
+```
+
+### 3. Environment Configuration
+
+Copy the environment example file and configure it:
+
+```bash
+cp env.example .env
+```
+
+Edit the `.env` file with your configuration:
+
+```
+# App URL
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/database"
+
+# Auth
+BETTER_AUTH_SECRET="your-secret-key"
+
+# OAuth Providers (optional)
+GITHUB_CLIENT_ID="your-github-client-id"
+GITHUB_CLIENT_SECRET="your-github-client-secret"
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+
+# File Storage (optional)
+R2_BUCKET_NAME="your-bucket-name"
+R2_ACCESS_KEY_ID="your-access-key-id"
+R2_SECRET_ACCESS_KEY="your-secret-access-key"
+R2_ENDPOINT="https://your-account-id.r2.cloudflarestorage.com"
+R2_PUBLIC_URL="https://your-domain.com"
+
+# Stripe Payment (optional)
+STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key"
+STRIPE_WEBHOOK_SECRET="whsec_your_webhook_secret"
+NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY="price_xxx"
+NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY="price_xxx"
+
+# Admin Configuration
+ADMIN_EMAILS="admin@example.com"
+```
+
+### 4. Database Setup
+
+Initialize your database with the required schema:
+
+```bash
+pnpm db:push
+```
+
+### 5. Start Development Server
+
+Launch the development server:
+
+```bash
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser to see your application running.
+
+## Key Features
+
+Your Better SaaS application includes:
+
+- **🔐 Authentication** - Email/password and social login with Better Auth
+- **💳 Payments** - Stripe integration with subscription management
+- **📁 File Management** - Upload and manage files with cloud storage
+- **🌍 Internationalization** - Multi-language support (English/Chinese)
+- **📱 Responsive Design** - Modern UI with Radix UI and Tailwind CSS
+- **📖 Documentation** - Built-in docs system with Fumadocs
+- **🔒 Protected Routes** - Role-based access control
+- **👥 Admin Dashboard** - User management and system administration
+
+## Available Scripts
+
+### Development
+- `pnpm dev` - Start development server
+- `pnpm build` - Build for production
+- `pnpm start` - Start production server
+
+### Code Quality
+- `pnpm check` - Run code quality checks
+- `pnpm check:write` - Fix code quality issues
+- `pnpm typecheck` - Run TypeScript checks
+
+### Database
+- `pnpm db:generate` - Generate database migrations
+- `pnpm db:migrate` - Run database migrations
+- `pnpm db:push` - Push schema changes to database
+- `pnpm db:studio` - Open database studio
+
+### Testing
+- `pnpm test` - Run all tests
+- `pnpm test:unit` - Run unit tests
+- `pnpm test:integration` - Run integration tests
+- `pnpm test:e2e` - Run end-to-end tests
+
+### Admin
+- `pnpm admin:setup` - Set up admin user account
+
+## Next Steps
+
+1. **Explore the Application** - Navigate through the dashboard and features
+2. **Configure Services** - Set up Stripe, OAuth providers, and file storage
+3. **Customize Content** - Update the homepage, pricing, and documentation
+4. **Deploy** - Follow the deployment guide to publish your application
+
+## Need Help?
+
+- Check the [Architecture](/docs/architecture) documentation
+- Review the project structure in the README
+- Explore the comprehensive testing suite
+- Join our community for support
+
+Start building your next SaaS application today!

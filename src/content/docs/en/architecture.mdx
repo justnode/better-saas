@@ -1,216 +1,542 @@
 ---
-title: Project Architecture
-description: Comprehensive analysis of Better SaaS project architecture design and technology stack
+title: Architecture
 ---
 
-# Project Architecture
+# Architecture Overview
 
-Better SaaS is a modern full-stack SaaS application built with cutting-edge technology stack, utilizing Next.js 15 and App Router architecture with high scalability and maintainability.
+Better SaaS is built with a modern, scalable architecture that follows industry best practices. This document provides an in-depth look at the system design, components, and architectural patterns used throughout the application.
 
-## Technical Architecture Overview
+## System Architecture
 
-### Core Technology Stack
+### High-Level Architecture
 
-| Domain | Technology | Version | Description |
-|--------|------------|---------|-------------|
-| **Frontend Framework** | Next.js | 15.x | App Router architecture with SSR/SSG support |
-| **UI Framework** | React | 19.x | Latest version with concurrent features |
-| **Programming Language** | TypeScript | 5.8+ | Strict mode for type safety |
-| **Styling System** | Tailwind CSS | 4.0+ | Atomic CSS with high customization |
-| **UI Component Library** | Radix UI | - | Accessible, high-quality components |
-| **Database** | PostgreSQL | - | Relational database |
-| **ORM** | Drizzle ORM | 0.41+ | Type-safe SQL query builder |
-| **Authentication** | Better Auth | 1.2+ | Modern authentication solution |
-| **Payment System** | Stripe | 18.x | Complete payment processing solution |
-| **State Management** | Zustand | 5.0+ | Lightweight state management |
-| **Internationalization** | next-intl | 4.1+ | Support for English and Chinese |
-| **Documentation** | Fumadocs | 15.x | MDX-based documentation generation |
-| **Code Quality** | Biome | 1.9+ | Code formatting and linting |
+<svg viewBox="0 0 800 400" className="w-full h-auto border rounded-lg bg-white dark:bg-gray-900">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
+    </marker>
+  </defs>
+  
+  {/* Client Layer */}
+  <rect x="50" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Client (Web)</text>
+  <text x="125" y="95" textAnchor="middle" className="text-sm fill-current">Next.js App</text>
+  <text x="125" y="115" textAnchor="middle" className="text-sm fill-current">(Frontend)</text>
+  
+  {/* API Gateway */}
+  <rect x="325" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">API Gateway</text>
+  <text x="400" y="95" textAnchor="middle" className="text-sm fill-current">Next.js API</text>
+  <text x="400" y="115" textAnchor="middle" className="text-sm fill-current">(Backend)</text>
+  
+  {/* Database */}
+  <rect x="600" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Database</text>
+  <text x="675" y="95" textAnchor="middle" className="text-sm fill-current">PostgreSQL</text>
+  
+  {/* CDN/Assets */}
+  <rect x="50" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">CDN/Assets</text>
+  <text x="125" y="315" textAnchor="middle" className="text-sm fill-current">Vercel/Static</text>
+  
+  {/* External APIs */}
+  <rect x="325" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">External APIs</text>
+  <text x="400" y="315" textAnchor="middle" className="text-sm fill-current">Stripe, OAuth</text>
+  
+  {/* File Storage */}
+  <rect x="600" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">File Storage</text>
+  <text x="675" y="315" textAnchor="middle" className="text-sm fill-current">Cloudflare R2</text>
+  
+  {/* Arrows */}
+  <line x1="200" y1="90" x2="325" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead)" />
+  <line x1="325" y1="90" x2="200" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead)" />
+  
+  <line x1="475" y1="90" x2="600" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead)" />
+  <line x1="600" y1="90" x2="475" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead)" />
+  
+  <line x1="125" y1="130" x2="125" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead)" />
+  <line x1="400" y1="130" x2="400" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead)" />
+  <line x1="675" y1="130" x2="675" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead)" />
+</svg>
 
-### Architectural Design Patterns
+### Core Components
 
-#### 1. Layered Architecture
+#### 1. Frontend Layer (Next.js App Router)
+- **Pages & Routing**: App Router with internationalized routes
+- **Components**: Reusable UI components with Radix UI
+- **State Management**: Zustand for client-side state
+- **Styling**: Tailwind CSS with custom design system
+- **Data Fetching**: SWR for caching and synchronization
 
-```
-┌─────────────────────────────────────┐
-│        Presentation Layer           │
-│  ┌─────────────┐  ┌─────────────┐   │
-│  │   Pages     │  │ Components  │   │
-│  │ /src/app    │  │/src/components│  │
-│  └─────────────┘  └─────────────┘   │
-├─────────────────────────────────────┤
-│          Business Layer             │
-│  ┌─────────────┐  ┌─────────────┐   │
-│  │  Services   │  │    Hooks    │   │
-│  │/src/db/services│ │ /src/hooks │   │
-│  └─────────────┘  └─────────────┘   │
-├─────────────────────────────────────┤
-│        Data Access Layer            │
-│  ┌─────────────┐  ┌─────────────┐   │
-│  │Repositories │  │   Schema    │   │
-│  │/src/db/repositories│/src/db/schema││
-│  └─────────────┘  └─────────────┘   │
-├─────────────────────────────────────┤
-│       Infrastructure Layer          │
-│  ┌─────────────┐  ┌─────────────┐   │
-│  │  Database   │  │   External  │   │
-│  │ PostgreSQL  │  │   Services  │   │
-│  └─────────────┘  └─────────────┘   │
-└─────────────────────────────────────┘
-```
+#### 2. Backend Layer (Next.js API Routes)
+- **API Endpoints**: RESTful APIs with type-safe routing
+- **Authentication**: Better Auth with multiple providers
+- **Database**: Drizzle ORM with PostgreSQL
+- **File Handling**: Secure upload and storage management
+- **Payment Processing**: Stripe integration with webhooks
 
-#### 2. Modular Design
+#### 3. Data Layer
+- **Database**: PostgreSQL with optimized schema
+- **ORM**: Drizzle for type-safe database operations
+- **Caching**: Redis for session and data caching
+- **File Storage**: Cloudflare R2 for static assets
 
-The project adopts a feature-based modular organization where each module handles specific business domains:
+## Authentication Flow
 
-- **Authentication Module** (`/src/lib/auth`): User authentication and authorization
-- **Payment Module** (`/src/lib/stripe`): Stripe payment integration
-- **File Management** (`/src/lib/file-service`): File upload and management
-- **Permission System** (`/src/lib/permissions`): Role-based access control
-- **Internationalization** (`/src/i18n`): Multi-language support
+### Multi-Provider Authentication
 
-#### 3. Component-Based Architecture
+<svg viewBox="0 0 800 400" className="w-full h-auto border rounded-lg bg-white dark:bg-gray-900">
+  <defs>
+    <marker id="arrowhead2" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
+    </marker>
+  </defs>
+  
+  {/* User Login */}
+  <rect x="50" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">User Login</text>
+  <text x="125" y="95" textAnchor="middle" className="text-sm fill-current">(Email/OAuth)</text>
+  
+  {/* Better Auth */}
+  <rect x="325" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Better Auth</text>
+  <text x="400" y="95" textAnchor="middle" className="text-sm fill-current">Middleware</text>
+  
+  {/* Database */}
+  <rect x="600" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Database</text>
+  <text x="675" y="95" textAnchor="middle" className="text-sm fill-current">Sessions</text>
+  
+  {/* JWT Token */}
+  <rect x="50" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">JWT Token</text>
+  <text x="125" y="315" textAnchor="middle" className="text-sm fill-current">Generation</text>
+  
+  {/* Role-Based Access */}
+  <rect x="325" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="285" textAnchor="middle" className="text-sm font-semibold fill-current">Role-Based</text>
+  <text x="400" y="305" textAnchor="middle" className="text-sm fill-current">Access Control</text>
+  
+  {/* User Profile */}
+  <rect x="600" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">User Profile</text>
+  <text x="675" y="315" textAnchor="middle" className="text-sm fill-current">Management</text>
+  
+  {/* Arrows */}
+  <line x1="200" y1="90" x2="325" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead2)" />
+  <line x1="475" y1="90" x2="600" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead2)" />
+  
+  <line x1="125" y1="130" x2="125" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead2)" />
+  <line x1="400" y1="130" x2="400" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead2)" />
+  <line x1="675" y1="130" x2="675" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead2)" />
+</svg>
 
-```
-src/components/
-├── ui/                 # Base UI components
-│   ├── button.tsx
-│   ├── input.tsx
-│   └── dialog.tsx
-├── blocks/             # Business block components
-│   ├── hero-section.tsx
-│   └── pricing-table.tsx
-├── dashboard/          # Dashboard components
-├── auth-guard.tsx      # Authentication guard
-└── providers/          # Context providers
-    ├── auth-provider.tsx
-    └── swr-provider.tsx
-```
-
-## Code Organization and Modularity
-
-### Directory Structure Design
-
-```
-src/
-├── app/                    # Next.js App Router
-│   ├── [locale]/          # Internationalized routes
-│   │   ├── (auth)/        # Authentication pages
-│   │   ├── (dashboard)/   # Dashboard pages
-│   │   └── docs/          # Documentation pages
-│   └── api/               # API routes
-│       ├── auth/          # Authentication APIs
-│       ├── stripe/        # Payment APIs
-│       └── files/         # File APIs
-├── components/            # React components
-├── db/                    # Database related
-│   ├── schema.ts         # Database schema
-│   ├── repositories/     # Data access layer
-│   ├── services/         # Business logic layer
-│   └── utils/            # Database utilities
-├── lib/                   # Utility libraries and configs
-├── hooks/                 # Custom React hooks
-├── store/                 # State management
-├── types/                 # TypeScript type definitions
-└── i18n/                  # Internationalization config
-```
-
-### Module Coupling Analysis
-
-#### Low Coupling Design
-
-1. **Interface Segregation**: Modules interact through well-defined interfaces
-2. **Dependency Injection**: External dependencies managed via config files and environment variables
-3. **Event-Driven**: Event system reduces direct dependencies between modules
-
-#### High Cohesion Implementation
-
-1. **Feature Aggregation**: Related functionality grouped within the same module
-2. **Data Encapsulation**: Each module manages its own data state
-3. **Single Responsibility**: Each module handles specific business domains
-
-### Interface Design Rationality
-
-#### API Design Principles
-
-1. **RESTful Style**: Follows REST design principles
-2. **Type Safety**: TypeScript ensures type safety
-3. **Error Handling**: Unified error handling mechanism
-4. **Version Control**: Supports API versioning
-
-#### Component Interface Design
-
-```typescript
-// Component Props interface example
-interface ButtonProps {
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
-  disabled?: boolean;
-  loading?: boolean;
-  children: React.ReactNode;
-  onClick?: () => void;
-}
-```
-
-## Scalability and Maintainability Assessment
-
-### Scalability Advantages
-
-1. **Modular Architecture**: New features can be added as independent modules
-2. **Plugin System**: Supports third-party service integrations
-3. **Configuration-Driven**: Feature toggles controlled via configuration files
-4. **Microservice-Ready**: Architecture supports future microservice decomposition
-
-### Maintainability Features
-
-1. **Code Standards**: Biome ensures code quality
-2. **Type Safety**: TypeScript provides compile-time type checking
-3. **Test-Friendly**: Components and functions are easily unit testable
-4. **Comprehensive Documentation**: Complete code comments and documentation
-
-### Performance Optimization Strategies
-
-1. **Code Splitting**: Automatic code splitting by Next.js
-2. **Image Optimization**: Using Next.js Image component
-3. **Caching Strategy**: Multi-layer caching mechanism
-4. **Lazy Loading**: Component and route lazy loading
+### Authentication Features
+- **Session Management**: Database-persisted sessions with configurable expiration
+- **Role-Based Access Control**: Admin, user, and custom role permissions
+- **Social Login**: GitHub, Google OAuth integration
+- **Security**: Password hashing, CSRF protection, secure cookies
+- **Password Reset**: Email-based password recovery flow
 
 ## Database Design
 
-### Data Model Design
+### Core Tables
 
-The project uses relational database design with the following core tables:
+#### Users Table
+```sql
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  name VARCHAR(255),
+  image TEXT,
+  role VARCHAR(50) DEFAULT 'user',
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
 
-- **User Table** (`user`): User basic information and authentication data
-- **Session Table** (`session`): User session management
-- **Subscription Table** (`subscriptions`): Stripe subscription information
-- **Payment Table** (`payments`): Payment records
-- **File Table** (`files`): File management
-- **Article Table** (`articles`): Content management
+#### Sessions Table
+```sql
+CREATE TABLE sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  token VARCHAR(255) UNIQUE NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
 
-### ORM Usage Strategy
+#### Files Table
+```sql
+CREATE TABLE files (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  filename VARCHAR(255) NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  mime_type VARCHAR(100) NOT NULL,
+  size INTEGER NOT NULL,
+  url TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
 
-Advantages of using Drizzle ORM:
+#### Payments Table
+```sql
+CREATE TABLE payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  stripe_customer_id VARCHAR(255),
+  stripe_subscription_id VARCHAR(255),
+  status VARCHAR(50) NOT NULL,
+  plan VARCHAR(50) NOT NULL,
+  amount INTEGER NOT NULL,
+  currency VARCHAR(3) DEFAULT 'usd',
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
 
-1. **Type Safety**: Compile-time type checking
-2. **High Performance**: Near-native SQL performance
-3. **Migration Management**: Automatic database migration generation and management
-4. **Query Builder**: Flexible query builder
+### Database Relationships
 
-## Security Design
+<svg viewBox="0 0 600 300" className="w-full h-auto border rounded-lg bg-white dark:bg-gray-900">
+  <defs>
+    <marker id="arrowhead3" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
+    </marker>
+  </defs>
+  
+  {/* Users */}
+  <rect x="50" y="100" width="120" height="60" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="110" y="125" textAnchor="middle" className="text-sm font-semibold fill-current">Users</text>
+  <text x="110" y="145" textAnchor="middle" className="text-xs fill-current">(1)</text>
+  
+  {/* Sessions */}
+  <rect x="250" y="50" width="120" height="60" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="310" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Sessions</text>
+  <text x="310" y="95" textAnchor="middle" className="text-xs fill-current">(N)</text>
+  
+  {/* Files */}
+  <rect x="250" y="130" width="120" height="60" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="310" y="155" textAnchor="middle" className="text-sm font-semibold fill-current">Files</text>
+  <text x="310" y="175" textAnchor="middle" className="text-xs fill-current">(N)</text>
+  
+  {/* Payments */}
+  <rect x="250" y="210" width="120" height="60" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="310" y="235" textAnchor="middle" className="text-sm font-semibold fill-current">Payments</text>
+  <text x="310" y="255" textAnchor="middle" className="text-xs fill-current">(N)</text>
+  
+  {/* Relationship lines */}
+  <line x1="170" y1="120" x2="250" y2="80" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead3)" />
+  <line x1="170" y1="130" x2="250" y2="160" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead3)" />
+  <line x1="170" y1="140" x2="250" y2="240" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead3)" />
+</svg>
 
-### Authentication and Authorization
+## File Management Architecture
 
-1. **Multiple Authentication Methods**: Email/password, OAuth (GitHub, Google)
-2. **Session Management**: Secure session token management
-3. **Access Control**: Role-based access control (RBAC)
-4. **API Protection**: Middleware protection for sensitive APIs
+### Upload Flow
 
-### Data Security
+<svg viewBox="0 0 800 400" className="w-full h-auto border rounded-lg bg-white dark:bg-gray-900">
+  <defs>
+    <marker id="arrowhead4" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
+    </marker>
+  </defs>
+  
+  {/* Client Upload */}
+  <rect x="50" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Client Upload</text>
+  <text x="125" y="95" textAnchor="middle" className="text-sm fill-current">(Form/Drag)</text>
+  
+  {/* API Endpoint */}
+  <rect x="325" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">API Endpoint</text>
+  <text x="400" y="95" textAnchor="middle" className="text-sm fill-current">/api/upload</text>
+  
+  {/* Validation */}
+  <rect x="600" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Validation</text>
+  <text x="675" y="95" textAnchor="middle" className="text-sm fill-current">Size/Type</text>
+  
+  {/* File Storage */}
+  <rect x="50" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">File Storage</text>
+  <text x="125" y="315" textAnchor="middle" className="text-sm fill-current">(R2/S3)</text>
+  
+  {/* Database */}
+  <rect x="325" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">Database</text>
+  <text x="400" y="315" textAnchor="middle" className="text-sm fill-current">Metadata</text>
+  
+  {/* Response */}
+  <rect x="600" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">Response</text>
+  <text x="675" y="315" textAnchor="middle" className="text-sm fill-current">URL/Status</text>
+  
+  {/* Arrows */}
+  <line x1="200" y1="90" x2="325" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead4)" />
+  <line x1="475" y1="90" x2="600" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead4)" />
+  
+  <line x1="125" y1="130" x2="125" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead4)" />
+  <line x1="400" y1="130" x2="400" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead4)" />
+  <line x1="675" y1="130" x2="675" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead4)" />
+</svg>
 
-1. **Input Validation**: Data validation using Zod
-2. **SQL Injection Protection**: Automatic protection via ORM
-3. **XSS Protection**: Automatic escaping by React
-4. **CSRF Protection**: Built-in CSRF protection
+### File Management Features
+- **Secure Uploads**: Validation, size limits, and type restrictions
+- **Image Processing**: Thumbnail generation and optimization
+- **Access Control**: User-based file permissions
+- **Cloud Storage**: Integration with Cloudflare R2/AWS S3
+- **Metadata Tracking**: File information and usage analytics
 
-This architectural design ensures high quality, scalability, and maintainability of the project, providing a solid foundation for building modern SaaS applications.
+## Payment System Architecture
+
+### Stripe Integration
+
+<svg viewBox="0 0 800 400" className="w-full h-auto border rounded-lg bg-white dark:bg-gray-900">
+  <defs>
+    <marker id="arrowhead5" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
+    </marker>
+  </defs>
+  
+  {/* Checkout Flow */}
+  <rect x="50" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Checkout Flow</text>
+  <text x="125" y="95" textAnchor="middle" className="text-sm fill-current">(Frontend)</text>
+  
+  {/* Stripe API */}
+  <rect x="325" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Stripe API</text>
+  <text x="400" y="95" textAnchor="middle" className="text-sm fill-current">(Payment)</text>
+  
+  {/* Webhook */}
+  <rect x="600" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Webhook</text>
+  <text x="675" y="95" textAnchor="middle" className="text-sm fill-current">Handler</text>
+  
+  {/* Subscription */}
+  <rect x="50" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">Subscription</text>
+  <text x="125" y="315" textAnchor="middle" className="text-sm fill-current">Management</text>
+  
+  {/* Database */}
+  <rect x="325" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">Database</text>
+  <text x="400" y="315" textAnchor="middle" className="text-sm fill-current">Update</text>
+  
+  {/* Email */}
+  <rect x="600" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">Email</text>
+  <text x="675" y="315" textAnchor="middle" className="text-sm fill-current">Notification</text>
+  
+  {/* Arrows */}
+  <line x1="200" y1="90" x2="325" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead5)" />
+  <line x1="475" y1="90" x2="600" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead5)" />
+  
+  <line x1="125" y1="130" x2="125" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead5)" />
+  <line x1="400" y1="130" x2="400" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead5)" />
+  <line x1="675" y1="130" x2="675" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead5)" />
+</svg>
+
+### Payment Features
+- **Subscription Management**: Multiple plans with billing cycles
+- **Webhook Processing**: Real-time payment event handling
+- **Invoice Generation**: Automated billing and receipts
+- **Trial Periods**: Configurable free trial functionality
+- **Payment Recovery**: Failed payment retry logic
+
+## Testing Architecture
+
+### Testing Pyramid
+
+<svg viewBox="0 0 400 300" className="w-full h-auto border rounded-lg bg-white dark:bg-gray-900">
+  {/* E2E Tests */}
+  <polygon points="200,50 120,120 280,120" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="200" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">E2E Tests</text>
+  <text x="200" y="95" textAnchor="middle" className="text-xs fill-current">(Playwright)</text>
+  
+  {/* Integration Tests */}
+  <polygon points="200,120 100,180 300,180" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="200" y="140" textAnchor="middle" className="text-sm font-semibold fill-current">Integration Tests</text>
+  <text x="200" y="160" textAnchor="middle" className="text-xs fill-current">(API + Database)</text>
+  
+  {/* Unit Tests */}
+  <polygon points="200,180 80,240 320,240" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="200" y="205" textAnchor="middle" className="text-sm font-semibold fill-current">Unit Tests</text>
+  <text x="200" y="225" textAnchor="middle" className="text-xs fill-current">(Components + Utils)</text>
+</svg>
+
+### Test Structure
+- **Unit Tests**: Component logic and utility functions
+- **Integration Tests**: API endpoints and database operations
+- **E2E Tests**: Complete user workflows and scenarios
+- **Visual Tests**: Screenshot comparison for UI consistency
+- **Performance Tests**: Load testing and optimization
+
+## Internationalization Architecture
+
+### i18n Structure
+
+<svg viewBox="0 0 800 400" className="w-full h-auto border rounded-lg bg-white dark:bg-gray-900">
+  <defs>
+    <marker id="arrowhead6" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
+    </marker>
+  </defs>
+  
+  {/* Route Locale */}
+  <rect x="50" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Route Locale</text>
+  <text x="125" y="95" textAnchor="middle" className="text-sm fill-current">[locale]/</text>
+  
+  {/* Message Resolution */}
+  <rect x="325" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Message</text>
+  <text x="400" y="95" textAnchor="middle" className="text-sm fill-current">Resolution</text>
+  
+  {/* Content Rendering */}
+  <rect x="600" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Content</text>
+  <text x="675" y="95" textAnchor="middle" className="text-sm fill-current">Rendering</text>
+  
+  {/* Language Detection */}
+  <rect x="50" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">Language</text>
+  <text x="125" y="315" textAnchor="middle" className="text-sm fill-current">Detection</text>
+  
+  {/* Translation Files */}
+  <rect x="325" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">Translation</text>
+  <text x="400" y="315" textAnchor="middle" className="text-sm fill-current">Files</text>
+  
+  {/* Localized Components */}
+  <rect x="600" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">Localized</text>
+  <text x="675" y="315" textAnchor="middle" className="text-sm fill-current">Components</text>
+  
+  {/* Arrows */}
+  <line x1="200" y1="90" x2="325" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead6)" />
+  <line x1="475" y1="90" x2="600" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead6)" />
+  
+  <line x1="125" y1="130" x2="125" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead6)" />
+  <line x1="400" y1="130" x2="400" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead6)" />
+  <line x1="675" y1="130" x2="675" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead6)" />
+</svg>
+
+### i18n Features
+- **Route-Based Localization**: Automatic locale detection
+- **Message Management**: Centralized translation files
+- **Dynamic Content**: Runtime language switching
+- **SEO Optimization**: Localized meta tags and URLs
+- **Fallback Handling**: Default language fallbacks
+
+## Security Architecture
+
+### Security Layers
+
+1. **Application Security**
+   - CSRF protection with tokens
+   - XSS prevention with sanitization
+   - SQL injection protection with ORM
+   - Rate limiting on API endpoints
+
+2. **Authentication Security**
+   - Secure password hashing (bcrypt)
+   - JWT token validation
+   - Session management with secure cookies
+   - OAuth provider integration
+
+3. **Data Security**
+   - Database encryption at rest
+   - Secure file upload validation
+   - Environment variable protection
+   - API key management
+
+4. **Infrastructure Security**
+   - HTTPS enforcement
+   - Security headers (CSP, HSTS)
+   - Dependency vulnerability scanning
+   - Regular security updates
+
+## Performance Optimization
+
+### Frontend Optimization
+- **Code Splitting**: Dynamic imports and route-based splitting
+- **Image Optimization**: Next.js Image component with WebP
+- **Caching**: Browser caching and CDN optimization
+- **Bundle Analysis**: Tree shaking and dead code elimination
+
+### Backend Optimization
+- **Database Indexing**: Optimized queries and indexes
+- **API Caching**: Response caching with Redis
+- **Connection Pooling**: Database connection optimization
+- **Lazy Loading**: On-demand resource loading
+
+## Deployment Architecture
+
+### Production Deployment
+
+<svg viewBox="0 0 800 400" className="w-full h-auto border rounded-lg bg-white dark:bg-gray-900">
+  <defs>
+    <marker id="arrowhead7" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
+    </marker>
+  </defs>
+  
+  {/* GitHub Repo */}
+  <rect x="50" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">GitHub Repo</text>
+  <text x="125" y="95" textAnchor="middle" className="text-sm fill-current">(Source)</text>
+  
+  {/* Vercel */}
+  <rect x="325" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Vercel</text>
+  <text x="400" y="95" textAnchor="middle" className="text-sm fill-current">(Build/Deploy)</text>
+  
+  {/* Production */}
+  <rect x="600" y="50" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="75" textAnchor="middle" className="text-sm font-semibold fill-current">Production</text>
+  <text x="675" y="95" textAnchor="middle" className="text-sm fill-current">Environment</text>
+  
+  {/* CI/CD */}
+  <rect x="50" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="125" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">CI/CD</text>
+  <text x="125" y="315" textAnchor="middle" className="text-sm fill-current">Pipeline</text>
+  
+  {/* Environment Variables */}
+  <rect x="325" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="400" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">Environment</text>
+  <text x="400" y="315" textAnchor="middle" className="text-sm fill-current">Variables</text>
+  
+  {/* Monitoring */}
+  <rect x="600" y="270" width="150" height="80" rx="8" fill="none" stroke="currentColor" strokeWidth="2" />
+  <text x="675" y="295" textAnchor="middle" className="text-sm font-semibold fill-current">Monitoring</text>
+  <text x="675" y="315" textAnchor="middle" className="text-sm fill-current">& Analytics</text>
+  
+  {/* Arrows */}
+  <line x1="200" y1="90" x2="325" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead7)" />
+  <line x1="475" y1="90" x2="600" y2="90" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead7)" />
+  
+  <line x1="125" y1="130" x2="125" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead7)" />
+  <line x1="400" y1="130" x2="400" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead7)" />
+  <line x1="675" y1="130" x2="675" y2="270" stroke="currentColor" strokeWidth="2" markerEnd="url(#arrowhead7)" />
+</svg>
+
+### Deployment Features
+- **Automated Deployment**: GitHub Actions CI/CD pipeline
+- **Environment Management**: Staging and production environments
+- **Health Monitoring**: Application performance monitoring
+- **Rollback Capability**: Quick rollback on deployment issues
+- **Scalability**: Auto-scaling based on traffic
+
+## Monitoring & Analytics
+
+### Application Monitoring
+- **Error Tracking**: Real-time error monitoring and alerting
+- **Performance Metrics**: Response times and resource usage
+- **User Analytics**: User behavior and engagement tracking
+- **Business Metrics**: Revenue, conversions, and growth metrics
+
+This architecture provides a solid foundation for building scalable, secure, and maintainable SaaS applications. The modular design allows for easy extension and customization based on specific business requirements.

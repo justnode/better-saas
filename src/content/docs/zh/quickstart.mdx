@@ -1,0 +1,156 @@
+---
+title: 快速开始
+---
+
+## 介绍
+
+几分钟内让您的 Better SaaS 项目运行起来。本指南将引导您完成从安装到运行第一个 SaaS 应用程序的完整设置过程。
+
+## 前置要求
+
+开始之前，请确保您的系统已安装以下软件：
+
+- **Node.js 18+** - [下载 Node.js](https://nodejs.org/)
+- **pnpm** - 包管理器 (`npm install -g pnpm`)
+- **PostgreSQL** - 数据库服务器
+- **Git** - 版本控制系统
+
+### 可选服务
+
+为了获得完整功能，您还需要：
+
+- **Stripe 账户** - 用于支付处理
+- **AWS S3 或 Cloudflare R2** - 用于文件存储
+- **GitHub/Google OAuth 应用** - 用于社交登录
+
+## 安装
+
+### 1. 克隆仓库
+
+```bash
+git clone <repository-url>
+cd better-saas
+```
+
+### 2. 安装依赖
+
+```bash
+pnpm install
+```
+
+### 3. 环境配置
+
+复制环境变量示例文件并进行配置：
+
+```bash
+cp env.example .env
+```
+
+编辑 `.env` 文件，配置您的环境变量：
+
+```
+# 应用 URL
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+
+# 数据库
+DATABASE_URL="postgresql://user:password@localhost:5432/database"
+
+# 认证
+BETTER_AUTH_SECRET="your-secret-key"
+
+# OAuth 提供商（可选）
+GITHUB_CLIENT_ID="your-github-client-id"
+GITHUB_CLIENT_SECRET="your-github-client-secret"
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+
+# 文件存储（可选）
+R2_BUCKET_NAME="your-bucket-name"
+R2_ACCESS_KEY_ID="your-access-key-id"
+R2_SECRET_ACCESS_KEY="your-secret-access-key"
+R2_ENDPOINT="https://your-account-id.r2.cloudflarestorage.com"
+R2_PUBLIC_URL="https://your-domain.com"
+
+# Stripe 支付（可选）
+STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key"
+STRIPE_WEBHOOK_SECRET="whsec_your_webhook_secret"
+NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY="price_xxx"
+NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY="price_xxx"
+
+# 管理员配置
+ADMIN_EMAILS="admin@example.com"
+```
+
+### 4. 数据库设置
+
+使用所需的模式初始化数据库：
+
+```bash
+pnpm db:push
+```
+
+### 5. 启动开发服务器
+
+启动开发服务器：
+
+```bash
+pnpm dev
+```
+
+在浏览器中打开 [http://localhost:3000](http://localhost:3000) 查看您的应用程序运行情况。
+
+## 核心功能
+
+您的 Better SaaS 应用程序包含：
+
+- **🔐 身份认证** - 使用 Better Auth 的邮箱/密码和社交登录
+- **💳 支付系统** - Stripe 集成和订阅管理
+- **📁 文件管理** - 云存储文件上传和管理
+- **🌍 国际化** - 多语言支持（中文/英文）
+- **📱 响应式设计** - 使用 Radix UI 和 Tailwind CSS 的现代 UI
+- **📖 文档系统** - 使用 Fumadocs 的内置文档系统
+- **🔒 受保护路由** - 基于角色的访问控制
+- **👥 管理面板** - 用户管理和系统管理
+
+## 可用脚本
+
+### 开发
+- `pnpm dev` - 启动开发服务器
+- `pnpm build` - 构建生产版本
+- `pnpm start` - 启动生产服务器
+
+### 代码质量
+- `pnpm check` - 运行代码质量检查
+- `pnpm check:write` - 修复代码质量问题
+- `pnpm typecheck` - 运行 TypeScript 检查
+
+### 数据库
+- `pnpm db:generate` - 生成数据库迁移
+- `pnpm db:migrate` - 运行数据库迁移
+- `pnpm db:push` - 推送模式更改到数据库
+- `pnpm db:studio` - 打开数据库工作室
+
+### 测试
+- `pnpm test` - 运行所有测试
+- `pnpm test:unit` - 运行单元测试
+- `pnpm test:integration` - 运行集成测试
+- `pnpm test:e2e` - 运行端到端测试
+
+### 管理
+- `pnpm admin:setup` - 设置管理员用户账户
+
+## 下一步
+
+1. **探索应用程序** - 浏览仪表板和功能
+2. **配置服务** - 设置 Stripe、OAuth 提供商和文件存储
+3. **自定义内容** - 更新首页、定价和文档
+4. **部署** - 按照部署指南发布您的应用程序
+
+## 需要帮助？
+
+- 查看[架构](/docs/architecture)文档
+- 查看 README 中的项目结构
+- 探索全面的测试套件
+- 加入我们的社区获取支持
+
+立即开始构建您的下一个 SaaS 应用程序！ 

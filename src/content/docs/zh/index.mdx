@@ -1,24 +1,170 @@
 ---
-title: 你好世界
+title: 介绍
 ---
 
-## 介绍
+# 欢迎使用 Better SaaS
 
-欢迎来到 Better SaaS 文档！
+Better SaaS 是一个现代化、生产就绪的 SaaS 应用程序模板，基于 Next.js 15 和最新的 Web 技术构建。它提供了构建、部署和扩展下一个 SaaS 应用程序所需的一切。
 
-这是一个基于 T3 Stack 的现代 SaaS 应用程序模板，包含以下特性：
+## 什么是 Better SaaS？
 
-- **Next.js 15** - 使用 App Router 的现代 React 框架
-- **TypeScript** - 类型安全的开发体验
+Better SaaS 是一个综合性的启动模板，结合了现代 Web 开发的最佳实践，专注于开发者体验和生产就绪性。它旨在通过提供一个坚实的基础和所有已实现的基本功能，帮助您更快地推出 SaaS 产品。
+
+## 核心功能
+
+### 🔐 身份认证与授权
+- **多提供商身份认证** 使用 Better Auth
+- 邮箱/密码和社交登录（GitHub、Google）
+- 基于角色的访问控制（RBAC）
+- 数据库持久化的会话管理
+- 密码重置和邮箱验证
+
+### 💳 支付与计费
+- **Stripe 集成** 完整的订阅管理
+- 多种定价计划和计费周期
+- 支付事件的 Webhook 处理
+- 计费仪表板和发票管理
+- 免费试用和订阅控制
+
+### 📁 文件管理
+- **云存储集成**（AWS S3/Cloudflare R2）
+- 带验证的安全文件上传
+- 图像处理和缩略图生成
+- 文件访问控制和权限
+- 支持多种文件类型
+
+### 🌍 国际化
+- **多语言支持** 使用 next-intl
+- 内置中英文翻译
+- 本地化路由和内容
+- 易于添加新语言
+
+### 📱 现代 UI/UX
+- **响应式设计** 使用 Tailwind CSS v4
+- Radix UI 组件确保无障碍访问
+- 深色/浅色主题支持
+- 移动优先的设计方法
+- 现代设计模式
+
+### 📖 文档系统
+- **内置文档系统** 使用 Fumadocs
+- MDX 支持丰富内容
+- 搜索功能
+- 代码高亮和示例
+- API 文档
+
+### 🔒 安全与性能
+- **受保护的路由** 使用中间件
+- TypeScript 类型安全开发
+- Next.js 15 优化的打包
+- 安全最佳实践
+- 性能监控
+
+### 🧪 测试套件
+- **全面的测试** 覆盖
+- 使用 Jest 和 React Testing Library 的单元测试
+- API 端点的集成测试
+- 使用 Playwright 的端到端测试
+- 视觉回归测试
+
+## 技术栈
+
+### 前端
+- **Next.js 15** - 使用 App Router 的 React 框架
+- **React 18** - 用户界面库
+- **TypeScript** - 类型安全的 JavaScript
 - **Tailwind CSS** - 实用优先的 CSS 框架
-- **Drizzle ORM** - 类型安全的数据库 ORM
-- **Better Auth** - 现代认证解决方案
-- **国际化支持** - 使用 next-intl 的多语言支持
+- **Radix UI** - 无障碍组件原语
+- **Zustand** - 状态管理
+- **SWR** - 数据获取和缓存
+
+### 后端
+- **Next.js API Routes** - 服务器端 API 端点
+- **Better Auth** - 身份认证和授权
+- **Drizzle ORM** - 类型安全的数据库工具包
+- **PostgreSQL** - 关系型数据库
+- **Stripe** - 支付处理
+- **Zod** - 模式验证
+
+### 基础设施
+- **Vercel** - 部署和托管
+- **Cloudflare R2** - 文件存储
+- **GitHub Actions** - CI/CD 流水线
+- **Biome** - 代码格式化和检查
+
+### 开发工具
+- **pnpm** - 包管理器
+- **Jest** - 单元测试框架
+- **Playwright** - 端到端测试
+- **Storybook** - 组件开发
+- **ESLint & Prettier** - 代码质量
+
+## 项目结构
+
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── [locale]/          # 国际化路由
+│   ├── api/               # API 端点
+│   └── globals.css        # 全局样式
+├── components/            # 可重用的 UI 组件
+│   ├── ui/                # 基础 UI 组件
+│   ├── blocks/            # 页面区块
+│   └── auth/              # 身份认证组件
+├── lib/                   # 工具库
+├── server/                # 服务器端代码
+├── config/                # 配置文件
+├── content/               # 内容管理
+├── i18n/                  # 国际化
+└── types/                 # TypeScript 定义
+```
 
 ## 快速开始
 
-1. 克隆项目
-2. 安装依赖：`pnpm install`
-3. 启动开发服务器：`pnpm dev`
+准备好构建您的 SaaS 应用程序了吗？按照我们全面的[快速开始](/docs/quickstart)指南，几分钟内即可启动并运行。
 
-开始构建你的下一个 SaaS 应用程序吧！ 
+### 快速设置
+
+1. **克隆仓库**
+   ```bash
+   git clone <repository-url>
+   cd better-saas
+   ```
+
+2. **安装依赖**
+   ```bash
+   pnpm install
+   ```
+
+3. **设置环境变量**
+   ```bash
+   cp env.example .env
+   ```
+
+4. **初始化数据库**
+   ```bash
+   pnpm db:push
+   ```
+
+5. **启动开发服务器**
+   ```bash
+   pnpm dev
+   ```
+
+## 为什么选择 Better SaaS？
+
+- **生产就绪** - 使用企业级模式和最佳实践构建
+- **开发者体验** - 出色的 TypeScript 支持和工具
+- **可扩展架构** - 设计为与您的业务一起成长
+- **全面功能** - 一个包中包含您需要的一切
+- **积极开发** - 定期更新和改进
+- **社区支持** - 不断增长的社区和文档
+
+## 下一步
+
+- [快速开始指南](/docs/quickstart) - 让您的项目运行起来
+- [架构概述](/docs/architecture) - 了解系统设计
+- [配置指南](/docs/configuration) - 自定义您的应用程序
+- [部署指南](/docs/deployment) - 部署到生产环境
+
+立即开始使用 Better SaaS 构建您的下一个 SaaS 应用程序！ 

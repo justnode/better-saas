@@ -2,21 +2,169 @@
 title: Introduction
 ---
 
-Welcome to Better SaaS documentation!
+# Welcome to Better SaaS
 
-This is a modern SaaS application template built with the T3 Stack, featuring:
+Better SaaS is a modern, production-ready SaaS application template built with Next.js 15 and the latest web technologies. It provides everything you need to build, deploy, and scale your next SaaS application.
 
-- **Next.js 15** - Modern React framework with App Router
-- **TypeScript** - Type-safe development experience
+## What is Better SaaS?
+
+Better SaaS is a comprehensive starter template that combines the best practices of modern web development with a focus on developer experience and production readiness. It's designed to help you launch your SaaS product faster by providing a solid foundation with all the essential features already implemented.
+
+## Key Features
+
+### 🔐 Authentication & Authorization
+- **Multi-provider authentication** with Better Auth
+- Email/password and social login (GitHub, Google)
+- Role-based access control (RBAC)
+- Session management with database persistence
+- Password reset and email verification
+
+### 💳 Payment & Billing
+- **Stripe integration** with full subscription management
+- Multiple pricing plans and billing cycles
+- Webhook handling for payment events
+- Billing dashboard and invoice management
+- Free trial and subscription controls
+
+### 📁 File Management
+- **Cloud storage integration** (AWS S3/Cloudflare R2)
+- Secure file uploads with validation
+- Image processing and thumbnail generation
+- File access control and permissions
+- Support for multiple file types
+
+### 🌍 Internationalization
+- **Multi-language support** with next-intl
+- Built-in English and Chinese translations
+- Localized routing and content
+- Easy to add new languages
+
+### 📱 Modern UI/UX
+- **Responsive design** with Tailwind CSS v4
+- Radix UI components for accessibility
+- Dark/light theme support
+- Mobile-first approach
+- Modern design patterns
+
+### 📖 Documentation System
+- **Built-in documentation** with Fumadocs
+- MDX support for rich content
+- Search functionality
+- Code highlighting and examples
+- API documentation
+
+### 🔒 Security & Performance
+- **Protected routes** with middleware
+- Type-safe development with TypeScript
+- Optimized bundle with Next.js 15
+- Security best practices
+- Performance monitoring
+
+### 🧪 Testing Suite
+- **Comprehensive testing** coverage
+- Unit tests with Jest and React Testing Library
+- Integration tests for API endpoints
+- End-to-end tests with Playwright
+- Visual regression testing
+
+## Technology Stack
+
+### Frontend
+- **Next.js 15** - React framework with App Router
+- **React 18** - User interface library
+- **TypeScript** - Type-safe JavaScript
 - **Tailwind CSS** - Utility-first CSS framework
-- **Drizzle ORM** - Type-safe database ORM
-- **Better Auth** - Modern authentication solution
-- **Internationalization** - Multi-language support with next-intl
+- **Radix UI** - Accessible component primitives
+- **Zustand** - State management
+- **SWR** - Data fetching and caching
 
-## Quick Start
+### Backend
+- **Next.js API Routes** - Server-side API endpoints
+- **Better Auth** - Authentication and authorization
+- **Drizzle ORM** - Type-safe database toolkit
+- **PostgreSQL** - Relational database
+- **Stripe** - Payment processing
+- **Zod** - Schema validation
 
-1. Clone the project
-2. Install dependencies: `pnpm install`
-3. Start development server: `pnpm dev`
+### Infrastructure
+- **Vercel** - Deployment and hosting
+- **Cloudflare R2** - File storage
+- **GitHub Actions** - CI/CD pipeline
+- **Biome** - Code formatting and linting
 
-Start building your next SaaS application!
+### Development Tools
+- **pnpm** - Package manager
+- **Jest** - Unit testing framework
+- **Playwright** - End-to-end testing
+- **Storybook** - Component development
+- **ESLint & Prettier** - Code quality
+
+## Project Structure
+
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── [locale]/          # Internationalized routes
+│   ├── api/               # API endpoints
+│   └── globals.css        # Global styles
+├── components/            # Reusable UI components
+│   ├── ui/                # Base UI components
+│   ├── blocks/            # Page sections
+│   └── auth/              # Authentication components
+├── lib/                   # Utility libraries
+├── server/                # Server-side code
+├── config/                # Configuration files
+├── content/               # Content management
+├── i18n/                  # Internationalization
+└── types/                 # TypeScript definitions
+```
+
+## Getting Started
+
+Ready to build your SaaS application? Follow our comprehensive [Quick Start](/docs/quickstart) guide to get up and running in minutes.
+
+### Quick Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd better-saas
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pnpm install
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   cp env.example .env
+   ```
+
+4. **Initialize database**
+   ```bash
+   pnpm db:push
+   ```
+
+5. **Start development server**
+   ```bash
+   pnpm dev
+   ```
+
+## Why Choose Better SaaS?
+
+- **Production Ready** - Built with enterprise-grade patterns and best practices
+- **Developer Experience** - Excellent TypeScript support and tooling
+- **Scalable Architecture** - Designed to grow with your business
+- **Comprehensive Features** - Everything you need in one package
+- **Active Development** - Regular updates and improvements
+- **Community Support** - Growing community and documentation
+
+## Next Steps
+
+- [Quick Start Guide](/docs/quickstart) - Get your project running
+- [Architecture Overview](/docs/architecture) - Understand the system design
+- [Configuration Guide](/docs/configuration) - Customize your application
+- [Deployment Guide](/docs/deployment) - Deploy to production
+
+Start building your next SaaS application today with Better SaaS!
