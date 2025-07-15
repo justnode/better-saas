@@ -1,0 +1,1069 @@
+---
+title: 文件管理
+---
+Better SaaS 提供强大的文件管理系统，集成云存储（Cloudflare R2/AWS S3）、安全文件上传、图像处理和全面的文件操作，具有适当的权限控制。
+
+import { Callout } from "@/components/widget/callout";
+
+<Callout type="warning">
+  请注意，文件管理功能只有成功配置管理员账户后才能使用。
+</Callout>
+
+
+## 概述
+
+文件管理系统包括：
+- **云存储集成**: 支持 Cloudflare R2 和 AWS S3
+- **安全文件上传**: 拖放界面和文件验证
+- **图像处理**: 自动缩略图生成和优化
+- **文件组织**: 文件夹、标签和搜索功能
+- **权限控制**: 基于用户和角色的访问控制
+- **文件分享**: 带过期时间和访问控制的安全分享
+- **批量操作**: 批量上传、下载和删除文件
+- **存储配额**: 基于订阅的存储限制
+
+
+## 云存储配置
+
+### Cloudflare R2 设置
+
+```
+# Cloudflare R2 配置
+CLOUDFLARE_R2_ACCESS_KEY_ID=your_access_key_id
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=your_secret_access_key
+CLOUDFLARE_R2_BUCKET_NAME=your_bucket_name
+CLOUDFLARE_R2_ENDPOINT=https://your_account_id.r2.cloudflarestorage.com
+CLOUDFLARE_R2_PUBLIC_URL=https://your_domain.com
+```
+
+### AWS S3 设置
+
+```
+# AWS S3 配置
+AWS_ACCESS_KEY_ID=your_access_key_id
+AWS_SECRET_ACCESS_KEY=your_secret_access_key
+AWS_BUCKET_NAME=your_bucket_name
+AWS_REGION=us-east-1
+AWS_BUCKET_URL=https://your_bucket.s3.amazonaws.com
+```
+
+### R2 客户端配置
+
+```typescript
+// src/lib/r2-client.ts
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+
+export const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: process.env.CLOUDFLARE_R2_ENDPOINT!,
+  credentials: {
+    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
+  },
+})
+
+export async function uploadFile(key: string, file: Buffer, contentType: string) {
+  const command = new PutObjectCommand({
+    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
+    Key: key,
+    Body: file,
+    ContentType: contentType,
+  })
+
+  await r2Client.send(command)
+  return `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`
+}
+
+export async function getSignedDownloadUrl(key: string, expiresIn = 3600) {
+  const command = new GetObjectCommand({
+    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
+    Key: key,
+  })
+
+  return await getSignedUrl(r2Client, command, { expiresIn })
+}
+
+export async function deleteFile(key: string) {
+  const command = new DeleteObjectCommand({
+    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME!,
+    Key: key,
+  })
+
+  await r2Client.send(command)
+}
+```
+
+## 数据库架构
+
+### 文件架构
+
+```typescript
+// src/server/db/schema.ts
+export const files = pgTable("files", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  originalName: text("originalName").notNull(),
+  mimeType: text("mimeType").notNull(),
+  size: integer("size").notNull(), // 以字节为单位
+  key: text("key").notNull(), // S3/R2 键
+  url: text("url").notNull(),
+  thumbnailUrl: text("thumbnailUrl"),
+  folderId: text("folderId").references(() => folders.id, { onDelete: "set null" }),
+  tags: text("tags").array(),
+  isPublic: boolean("isPublic").default(false),
+  downloadCount: integer("downloadCount").default(0),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const folders = pgTable("folders", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  parentId: text("parentId").references(() => folders.id, { onDelete: "cascade" }),
+  isPublic: boolean("isPublic").default(false),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const fileShares = pgTable("fileShares", {
+  id: text("id").primaryKey(),
+  fileId: text("fileId")
+    .notNull()
+    .references(() => files.id, { onDelete: "cascade" }),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  sharedWithUserId: text("sharedWithUserId")
+    .references(() => users.id, { onDelete: "cascade" }),
+  shareToken: text("shareToken").unique(),
+  permissions: text("permissions").notNull(), // read, write, delete
+  expiresAt: timestamp("expiresAt", { mode: "date" }),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+})
+```
+
+## 文件服务
+
+### 核心文件服务
+
+```typescript
+// src/lib/file-service.ts
+import { r2Client, uploadFile, deleteFile } from './r2-client'
+import { db } from '@/server/db'
+import { files, folders } from '@/server/db/schema'
+import { eq, and } from 'drizzle-orm'
+import sharp from 'sharp'
+import { nanoid } from 'nanoid'
+
+export class FileService {
+  private static instance: FileService
+  private readonly maxFileSize = 10 * 1024 * 1024 // 10MB
+  private readonly allowedMimeTypes = [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'application/pdf',
+    'text/plain',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ]
+
+  static getInstance(): FileService {
+    if (!FileService.instance) {
+      FileService.instance = new FileService()
+    }
+    return FileService.instance
+  }
+
+  async uploadFile(
+    file: File,
+    userId: string,
+    folderId?: string
+  ): Promise<{ id: string; url: string; thumbnailUrl?: string }> {
+    // 验证文件
+    this.validateFile(file)
+
+    // 生成唯一键
+    const fileExtension = file.name.split('.').pop()
+    const key = `${userId}/${nanoid()}.${fileExtension}`
+
+    // 转换文件为缓冲区
+    const buffer = Buffer.from(await file.arrayBuffer())
+
+    // 上传到 R2
+    const url = await uploadFile(key, buffer, file.type)
+
+    // 为图像生成缩略图
+    let thumbnailUrl: string | undefined
+    if (file.type.startsWith('image/')) {
+      thumbnailUrl = await this.generateThumbnail(buffer, key, file.type)
+    }
+
+    // 保存到数据库
+    const fileId = nanoid()
+    await db.insert(files).values({
+      id: fileId,
+      userId,
+      name: this.generateFileName(file.name),
+      originalName: file.name,
+      mimeType: file.type,
+      size: file.size,
+      key,
+      url,
+      thumbnailUrl,
+      folderId,
+    })
+
+    return { id: fileId, url, thumbnailUrl }
+  }
+
+  private async generateThumbnail(
+    buffer: Buffer,
+    originalKey: string,
+    mimeType: string
+  ): Promise<string> {
+    const thumbnailBuffer = await sharp(buffer)
+      .resize(200, 200, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer()
+
+    const thumbnailKey = `thumbnails/${originalKey.replace(/\.[^/.]+$/, '.jpg')}`
+    return await uploadFile(thumbnailKey, thumbnailBuffer, 'image/jpeg')
+  }
+
+  private validateFile(file: File): void {
+    if (file.size > this.maxFileSize) {
+      throw new Error(`文件大小超过 ${this.maxFileSize / 1024 / 1024}MB 限制`)
+    }
+
+    if (!this.allowedMimeTypes.includes(file.type)) {
+      throw new Error(`文件类型 ${file.type} 不被允许`)
+    }
+  }
+
+  private generateFileName(originalName: string): string {
+    const timestamp = Date.now()
+    const extension = originalName.split('.').pop()
+    const nameWithoutExtension = originalName.replace(/\.[^/.]+$/, '')
+    return `${nameWithoutExtension}-${timestamp}.${extension}`
+  }
+
+  async deleteFile(fileId: string, userId: string): Promise<void> {
+    const [file] = await db
+      .select()
+      .from(files)
+      .where(and(eq(files.id, fileId), eq(files.userId, userId)))
+
+    if (!file) {
+      throw new Error('文件未找到')
+    }
+
+    // 从 R2 删除
+    await deleteFile(file.key)
+    if (file.thumbnailUrl) {
+      const thumbnailKey = file.thumbnailUrl.split('/').pop()!
+      await deleteFile(`thumbnails/${thumbnailKey}`)
+    }
+
+    // 从数据库删除
+    await db.delete(files).where(eq(files.id, fileId))
+  }
+
+  async getUserFiles(userId: string, folderId?: string) {
+    return await db
+      .select()
+      .from(files)
+      .where(
+        and(
+          eq(files.userId, userId),
+          folderId ? eq(files.folderId, folderId) : eq(files.folderId, null)
+        )
+      )
+      .orderBy(files.createdAt)
+  }
+
+  async createFolder(name: string, userId: string, parentId?: string) {
+    const folderId = nanoid()
+    await db.insert(folders).values({
+      id: folderId,
+      name,
+      userId,
+      parentId,
+    })
+    return folderId
+  }
+
+  async getUserFolders(userId: string, parentId?: string) {
+    return await db
+      .select()
+      .from(folders)
+      .where(
+        and(
+          eq(folders.userId, userId),
+          parentId ? eq(folders.parentId, parentId) : eq(folders.parentId, null)
+        )
+      )
+      .orderBy(folders.createdAt)
+  }
+}
+```
+
+## 文件上传组件
+
+### 文件上传组件
+
+```tsx
+// src/components/file-manager/file-upload.tsx
+"use client"
+
+import { useState, useCallback } from 'react'
+import { useDropzone } from 'react-dropzone'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { Card, CardContent } from '@/components/ui/card'
+import { Upload, X, File, Image } from 'lucide-react'
+import { uploadFiles } from '@/server/actions/file-actions'
+
+interface FileUploadProps {
+  folderId?: string
+  onUploadComplete?: (files: any[]) => void
+  maxFiles?: number
+  maxSize?: number
+}
+
+export function FileUpload({ 
+  folderId, 
+  onUploadComplete, 
+  maxFiles = 10, 
+  maxSize = 10 * 1024 * 1024 
+}: FileUploadProps) {
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    setSelectedFiles(prev => [...prev, ...acceptedFiles].slice(0, maxFiles))
+  }, [maxFiles])
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    maxSize,
+    accept: {
+      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
+      'application/pdf': ['.pdf'],
+      'text/plain': ['.txt'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+    },
+  })
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleUpload = async () => {
+    if (selectedFiles.length === 0) return
+
+    setUploading(true)
+    setUploadProgress(0)
+
+    try {
+      const formData = new FormData()
+      selectedFiles.forEach(file => {
+        formData.append('files', file)
+      })
+      if (folderId) {
+        formData.append('folderId', folderId)
+      }
+
+      const uploadedFiles = await uploadFiles(formData)
+      
+      onUploadComplete?.(uploadedFiles)
+      setSelectedFiles([])
+    } catch (error) {
+      console.error('上传失败:', error)
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-6">
+          <div
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+              isDragActive 
+                ? 'border-primary bg-primary/10' 
+                : 'border-gray-300 hover:border-gray-400'
+            }`}
+          >
+            <input {...getInputProps()} />
+            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <p className="text-lg font-medium mb-2">
+              {isDragActive ? '拖放文件到此处' : '拖放文件到此处'}
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              或点击选择文件
+            </p>
+            <Button type="button" variant="outline">
+              选择文件
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {selectedFiles.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="space-y-2">
+              <h3 className="font-medium">已选择文件 ({selectedFiles.length})</h3>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      {file.type.startsWith('image/') ? (
+                        <Image className="h-4 w-4" />
+                      ) : (
+                        <File className="h-4 w-4" />
+                      )}
+                      <span className="text-sm truncate">{file.name}</span>
+                      <span className="text-xs text-gray-500">
+                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeFile(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {uploading && (
+              <div className="mt-4">
+                <Progress value={uploadProgress} className="w-full" />
+                <p className="text-sm text-gray-500 mt-1">
+                  上传中... {uploadProgress}%
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSelectedFiles([])}
+                disabled={uploading}
+              >
+                清除
+              </Button>
+              <Button
+                type="button"
+                onClick={handleUpload}
+                disabled={uploading || selectedFiles.length === 0}
+              >
+                {uploading ? '上传中...' : `上传 ${selectedFiles.length} 个文件`}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+```
+
+### 文件管理器组件
+
+```tsx
+// src/components/file-manager/file-manager.tsx
+"use client"
+
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu'
+import { 
+  Folder, 
+  File, 
+  Image, 
+  Download, 
+  Trash2, 
+  Share, 
+  Search,
+  Grid,
+  List,
+  MoreHorizontal
+} from 'lucide-react'
+import { FileUpload } from './file-upload'
+import { FileGrid } from './file-grid'
+import { FileTable } from './file-table'
+import { getUserFiles, getUserFolders, deleteFile } from '@/server/actions/file-actions'
+
+interface FileManagerProps {
+  userId: string
+}
+
+export function FileManager({ userId }: FileManagerProps) {
+  const [files, setFiles] = useState<any[]>([])
+  const [folders, setFolders] = useState<any[]>([])
+  const [currentFolder, setCurrentFolder] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadFiles()
+  }, [currentFolder])
+
+  const loadFiles = async () => {
+    setLoading(true)
+    try {
+      const [filesData, foldersData] = await Promise.all([
+        getUserFiles(currentFolder),
+        getUserFolders(currentFolder)
+      ])
+      setFiles(filesData)
+      setFolders(foldersData)
+    } catch (error) {
+      console.error('加载文件失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUploadComplete = (uploadedFiles: any[]) => {
+    setFiles(prev => [...prev, ...uploadedFiles])
+  }
+
+  const handleDeleteFile = async (fileId: string) => {
+    try {
+      await deleteFile(fileId)
+      setFiles(prev => prev.filter(file => file.id !== fileId))
+    } catch (error) {
+      console.error('删除文件失败:', error)
+    }
+  }
+
+  const filteredFiles = files.filter(file =>
+    file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    file.originalName.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const filteredFolders = folders.filter(folder =>
+    folder.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">文件管理器</h1>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="搜索文件..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-64"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+          >
+            {viewMode === 'grid' ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+
+      <FileUpload
+        folderId={currentFolder}
+        onUploadComplete={handleUploadComplete}
+      />
+
+      {loading ? (
+        <div className="text-center py-8">加载文件中...</div>
+      ) : (
+        <div className="space-y-4">
+          {/* 文件夹 */}
+          {filteredFolders.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Folder className="h-5 w-5" />
+                  文件夹
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredFolders.map((folder) => (
+                    <div
+                      key={folder.id}
+                      className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setCurrentFolder(folder.id)}
+                    >
+                      <Folder className="h-8 w-8 text-blue-500" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{folder.name}</p>
+                        <p className="text-sm text-gray-500">
+                          {folder.createdAt.toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 文件 */}
+          {filteredFiles.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <File className="h-5 w-5" />
+                  文件 ({filteredFiles.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {viewMode === 'grid' ? (
+                  <FileGrid files={filteredFiles} onDelete={handleDeleteFile} />
+                ) : (
+                  <FileTable files={filteredFiles} onDelete={handleDeleteFile} />
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="text-center py-8">
+                <File className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-lg font-medium mb-2">未找到文件</p>
+                <p className="text-gray-500">
+                  {searchQuery ? '尝试调整搜索查询' : '上传一些文件开始使用'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+## 服务器操作
+
+### 文件操作
+
+```typescript
+// src/server/actions/file-actions.ts
+"use server"
+
+import { auth } from "@/lib/auth/auth"
+import { headers } from "next/headers"
+import { FileService } from "@/lib/file-service"
+import { db } from "@/server/db"
+import { files, folders } from "@/server/db/schema"
+import { eq, and } from "drizzle-orm"
+import { revalidatePath } from "next/cache"
+
+export async function uploadFiles(formData: FormData) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session?.user) {
+    throw new Error("未授权")
+  }
+
+  const fileService = FileService.getInstance()
+  const uploadedFiles = []
+  const files = formData.getAll('files') as File[]
+  const folderId = formData.get('folderId') as string | undefined
+
+  for (const file of files) {
+    try {
+      const result = await fileService.uploadFile(file, session.user.id, folderId)
+      uploadedFiles.push(result)
+    } catch (error) {
+      console.error(`上传 ${file.name} 失败:`, error)
+    }
+  }
+
+  revalidatePath('/dashboard/files')
+  return uploadedFiles
+}
+
+export async function getUserFiles(folderId?: string) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session?.user) {
+    throw new Error("未授权")
+  }
+
+  const fileService = FileService.getInstance()
+  return await fileService.getUserFiles(session.user.id, folderId)
+}
+
+export async function getUserFolders(parentId?: string) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session?.user) {
+    throw new Error("未授权")
+  }
+
+  const fileService = FileService.getInstance()
+  return await fileService.getUserFolders(session.user.id, parentId)
+}
+
+export async function deleteFile(fileId: string) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session?.user) {
+    throw new Error("未授权")
+  }
+
+  const fileService = FileService.getInstance()
+  await fileService.deleteFile(fileId, session.user.id)
+
+  revalidatePath('/dashboard/files')
+}
+
+export async function createFolder(name: string, parentId?: string) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session?.user) {
+    throw new Error("未授权")
+  }
+
+  const fileService = FileService.getInstance()
+  const folderId = await fileService.createFolder(name, session.user.id, parentId)
+
+  revalidatePath('/dashboard/files')
+  return folderId
+}
+```
+
+## 文件分享
+
+### 分享管理
+
+```typescript
+// src/server/actions/share-actions.ts
+"use server"
+
+import { auth } from "@/lib/auth/auth"
+import { headers } from "next/headers"
+import { db } from "@/server/db"
+import { fileShares, files } from "@/server/db/schema"
+import { eq, and } from "drizzle-orm"
+import { nanoid } from "nanoid"
+
+export async function shareFile(
+  fileId: string,
+  permissions: 'read' | 'write' | 'delete',
+  expiresAt?: Date
+) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session?.user) {
+    throw new Error("未授权")
+  }
+
+  // 验证文件所有权
+  const [file] = await db
+    .select()
+    .from(files)
+    .where(and(eq(files.id, fileId), eq(files.userId, session.user.id)))
+
+  if (!file) {
+    throw new Error("文件未找到")
+  }
+
+  const shareToken = nanoid(32)
+  const shareId = nanoid()
+
+  await db.insert(fileShares).values({
+    id: shareId,
+    fileId,
+    userId: session.user.id,
+    shareToken,
+    permissions,
+    expiresAt,
+  })
+
+  return {
+    shareId,
+    shareToken,
+    shareUrl: `${process.env.NEXT_PUBLIC_APP_URL}/share/${shareToken}`,
+  }
+}
+
+export async function getSharedFile(shareToken: string) {
+  const [share] = await db
+    .select({
+      file: files,
+      share: fileShares,
+    })
+    .from(fileShares)
+    .innerJoin(files, eq(fileShares.fileId, files.id))
+    .where(eq(fileShares.shareToken, shareToken))
+
+  if (!share) {
+    throw new Error("分享未找到")
+  }
+
+  // 检查分享是否已过期
+  if (share.share.expiresAt && share.share.expiresAt < new Date()) {
+    throw new Error("分享已过期")
+  }
+
+  return share
+}
+```
+
+## 图像处理
+
+### 图像优化
+
+```typescript
+// src/lib/image-processing.ts
+import sharp from 'sharp'
+
+export class ImageProcessor {
+  static async optimizeImage(
+    buffer: Buffer,
+    options: {
+      width?: number
+      height?: number
+      quality?: number
+      format?: 'jpeg' | 'png' | 'webp'
+    } = {}
+  ): Promise<Buffer> {
+    const {
+      width = 1920,
+      height = 1080,
+      quality = 80,
+      format = 'jpeg'
+    } = options
+
+    let processor = sharp(buffer)
+      .resize(width, height, { 
+        fit: 'inside', 
+        withoutEnlargement: true 
+      })
+
+    switch (format) {
+      case 'jpeg':
+        processor = processor.jpeg({ quality })
+        break
+      case 'png':
+        processor = processor.png({ quality })
+        break
+      case 'webp':
+        processor = processor.webp({ quality })
+        break
+    }
+
+    return await processor.toBuffer()
+  }
+
+  static async generateThumbnail(
+    buffer: Buffer,
+    size: number = 200
+  ): Promise<Buffer> {
+    return await sharp(buffer)
+      .resize(size, size, { fit: 'cover' })
+      .jpeg({ quality: 80 })
+      .toBuffer()
+  }
+
+  static async getImageMetadata(buffer: Buffer) {
+    const metadata = await sharp(buffer).metadata()
+    return {
+      width: metadata.width,
+      height: metadata.height,
+      format: metadata.format,
+      size: metadata.size,
+      hasAlpha: metadata.hasAlpha,
+    }
+  }
+}
+```
+
+## 测试文件管理
+
+### 单元测试
+
+```typescript
+// src/lib/file-service.test.ts
+import { describe, it, expect, vi } from 'vitest'
+import { FileService } from './file-service'
+
+describe('FileService', () => {
+  const fileService = FileService.getInstance()
+
+  it('应该验证文件大小', () => {
+    const mockFile = new File([''], 'test.txt', { 
+      type: 'text/plain' 
+    })
+    
+    // 模拟文件大小超过限制
+    Object.defineProperty(mockFile, 'size', { value: 20 * 1024 * 1024 })
+
+    expect(() => fileService.validateFile(mockFile)).toThrow()
+  })
+
+  it('应该验证文件类型', () => {
+    const mockFile = new File([''], 'test.exe', { 
+      type: 'application/exe' 
+    })
+
+    expect(() => fileService.validateFile(mockFile)).toThrow()
+  })
+
+  it('应该生成唯一的文件名', () => {
+    const name1 = fileService.generateFileName('test.txt')
+    const name2 = fileService.generateFileName('test.txt')
+    
+    expect(name1).not.toBe(name2)
+    expect(name1).toMatch(/test-\d+\.txt/)
+  })
+})
+```
+
+### 集成测试
+
+```typescript
+// tests/integration/file-upload.test.ts
+import { describe, it, expect } from 'vitest'
+import { testClient } from '../utils/test-client'
+
+describe('文件上传 API', () => {
+  it('应该成功上传文件', async () => {
+    const formData = new FormData()
+    const file = new File(['test content'], 'test.txt', { type: 'text/plain' })
+    formData.append('files', file)
+
+    const response = await testClient.post('/api/files/upload', formData)
+    
+    expect(response.status).toBe(200)
+    expect(response.data).toHaveProperty('id')
+    expect(response.data).toHaveProperty('url')
+  })
+
+  it('应该拒绝无效的文件类型', async () => {
+    const formData = new FormData()
+    const file = new File(['test'], 'test.exe', { type: 'application/exe' })
+    formData.append('files', file)
+
+    const response = await testClient.post('/api/files/upload', formData)
+    
+    expect(response.status).toBe(400)
+  })
+})
+```
+
+## 安全最佳实践
+
+### 文件验证
+
+```typescript
+// src/lib/file-validation.ts
+import { createHash } from 'crypto'
+
+export class FileValidator {
+  private static readonly ALLOWED_EXTENSIONS = [
+    'jpg', 'jpeg', 'png', 'gif', 'webp',
+    'pdf', 'txt', 'doc', 'docx'
+  ]
+
+  private static readonly MAGIC_NUMBERS = {
+    'image/jpeg': [0xFF, 0xD8, 0xFF],
+    'image/png': [0x89, 0x50, 0x4E, 0x47],
+    'application/pdf': [0x25, 0x50, 0x44, 0x46],
+  }
+
+  static validateFileType(file: File, buffer: Buffer): boolean {
+    const extension = file.name.split('.').pop()?.toLowerCase()
+    
+    if (!extension || !this.ALLOWED_EXTENSIONS.includes(extension)) {
+      return false
+    }
+
+    // 检查魔数
+    const magicNumbers = this.MAGIC_NUMBERS[file.type as keyof typeof this.MAGIC_NUMBERS]
+    if (magicNumbers) {
+      const fileHeader = Array.from(buffer.slice(0, magicNumbers.length))
+      return magicNumbers.every((byte, index) => byte === fileHeader[index])
+    }
+
+    return true
+  }
+
+  static generateFileHash(buffer: Buffer): string {
+    return createHash('sha256').update(buffer).digest('hex')
+  }
+
+  static sanitizeFileName(fileName: string): string {
+    return fileName
+      .replace(/[^a-zA-Z0-9.-]/g, '_')
+      .replace(/_{2,}/g, '_')
+      .substring(0, 255)
+  }
+}
+```
+
+## 故障排除
+
+### 常见问题
+
+1. **文件上传失败**
+   - 检查文件大小和类型限制
+   - 验证 R2/S3 凭据和权限
+   - 检查网络连接
+
+2. **缩略图未生成**
+   - 验证 Sharp 安装
+   - 检查图像格式支持
+   - 查看错误日志
+
+3. **存储配额超限**
+   - 实施配额检查
+   - 清理旧文件
+   - 升级订阅计划

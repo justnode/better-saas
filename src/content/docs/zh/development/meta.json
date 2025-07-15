@@ -1,0 +1,10 @@
+{
+  "title": "开发者指南",
+  "defaultOpen": true,
+  "pages": [
+    "configuration",
+    "project-structure",
+    "database-development",
+    "api-development"
+  ]
+}

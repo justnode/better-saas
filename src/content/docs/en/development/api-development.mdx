@@ -1,0 +1,482 @@
+---
+title: API Development Guide
+description: Complete guide for developing APIs in Better SaaS
+---
+
+# API Development Guide
+
+This guide covers API development patterns, server actions, and webhook implementation in Better SaaS.
+
+## API Architecture
+
+### Next.js App Router API Structure
+
+```
+src/app/api/
+├── auth/
+│   └── [...all]/
+│       └── route.ts          # Better Auth handler
+└── webhooks/
+    └── stripe/
+        └── route.ts          # Stripe webhook handler
+```
+
+### API Route Pattern
+
+```typescript
+// src/app/api/example/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth/auth';
+
+export async function GET(request: NextRequest) {
+  try {
+    // Authentication check
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // Business logic
+    const data = await getExampleData(session.user.id);
+
+    return NextResponse.json({ data });
+  } catch (error) {
+    console.error('API Error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    
+    // Validate input
+    const validatedData = validateInput(body);
+    
+    // Process request
+    const result = await processData(validatedData, session.user.id);
+
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('API Error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## Server Actions
+
+### Server Action Pattern
+
+```typescript
+// src/server/actions/example-actions.ts
+'use server';
+
+import { auth } from '@/lib/auth/auth';
+import { headers } from 'next/headers';
+import { getErrorMessage } from './error-messages';
+import { ErrorLogger } from '@/lib/logger/logger-utils';
+
+const actionLogger = new ErrorLogger('example-actions');
+
+export interface ExampleResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
+export async function exampleAction(
+  formData: FormData
+): Promise<ExampleResponse> {
+  let session: { user?: { id: string } } | null = null;
+
+  try {
+    // Authentication
+    session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      throw new Error(await getErrorMessage('unauthorizedAccess'));
+    }
+
+    // Extract and validate data
+    const data = extractFormData(formData);
+    validateData(data);
+
+    // Business logic
+    const result = await processAction(data, session.user.id);
+
+    return {
+      success: true,
+      data: result,
+    };
+  } catch (error) {
+    actionLogger.logError(error as Error, {
+      operation: 'exampleAction',
+      userId: session?.user?.id,
+    });
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Action failed',
+    };
+  }
+}
+```
+
+### File Upload Action
+
+```typescript
+// src/server/actions/file-actions.ts
+export async function uploadFileAction(
+  formData: FormData
+): Promise<FileUploadResponse> {
+  let session: { user?: User } | null = null;
+  let file: File | null = null;
+
+  try {
+    session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      throw new Error(await getErrorMessage('unauthorizedAccess'));
+    }
+
+    file = formData.get('file') as File;
+
+    if (!file) {
+      throw new Error(await getErrorMessage('noFileSelected'));
+    }
+
+    const fileInfo = await uploadFile(file, session.user.id);
+
+    return {
+      success: true,
+      file: fileInfo,
+    };
+  } catch (error) {
+    fileErrorLogger.logError(error as Error, {
+      operation: 'uploadFile',
+      userId: session?.user?.id,
+      fileName: file?.name,
+    });
+
+    throw new Error(
+      error instanceof Error ? error.message : 'File upload failed'
+    );
+  }
+}
+```
+
+### Error Handling
+
+```typescript
+// src/server/actions/error-messages.ts
+import { getLocale } from 'next-intl/server';
+
+export async function getErrorMessage(key: string): Promise<string> {
+  const locale = await getLocale();
+  
+  const messages = {
+    zh: {
+      unauthorizedAccess: '未授权访问',
+      fileNotFound: '未找到文件',
+      fileUploadFailed: '文件上传失败',
+      // ... more messages
+    },
+    en: {
+      unauthorizedAccess: 'Unauthorized access',
+      fileNotFound: 'File not found',
+      fileUploadFailed: 'File upload failed',
+      // ... more messages
+    },
+  };
+
+  const localeMessages = messages[locale as keyof typeof messages] || messages.en;
+  return localeMessages[key as keyof typeof localeMessages] || key;
+}
+```
+
+## Webhook Implementation
+
+### Stripe Webhook Handler
+
+```typescript
+// src/app/api/webhooks/stripe/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { StripeProvider } from '@/payment/stripe/provider';
+import { paymentRepository } from '@/server/db/repositories/payment-repository';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.text();
+    const signature = request.headers.get('stripe-signature');
+
+    if (!signature) {
+      return NextResponse.json(
+        { error: 'Missing signature' },
+        { status: 400 }
+      );
+    }
+
+    const stripeProvider = new StripeProvider();
+    
+    // Verify webhook signature
+    const isValid = await stripeProvider.verifyWebhook(body, signature);
+    if (!isValid) {
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 400 }
+      );
+    }
+
+    // Construct event
+    const event = stripeProvider.constructWebhookEvent(body, signature);
+
+    // Handle event
+    await handleStripeEvent(event);
+
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    return NextResponse.json(
+      { error: 'Webhook handler failed' },
+      { status: 500 }
+    );
+  }
+}
+
+async function handleStripeEvent(event: Stripe.Event) {
+  switch (event.type) {
+    case 'checkout.session.completed':
+      await handleCheckoutSessionCompleted(event);
+      break;
+    case 'customer.subscription.updated':
+      await handleSubscriptionUpdated(event);
+      break;
+    // ... more event handlers
+  }
+}
+```
+
+## Authentication Integration
+
+### Protected API Routes
+
+```typescript
+// src/lib/auth/api-middleware.ts
+import { auth } from '@/lib/auth/auth';
+import { isAdmin } from '@/lib/auth/permissions';
+import { NextRequest } from 'next/server';
+
+export async function withAuth(
+  request: NextRequest,
+  handler: (request: NextRequest, user: any) => Promise<Response>
+) {
+  try {
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session?.user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401 }
+      );
+    }
+
+    return handler(request, session.user);
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: 'Authentication failed' }),
+      { status: 401 }
+    );
+  }
+}
+
+export async function withAdminAuth(
+  request: NextRequest,
+  handler: (request: NextRequest, user: any) => Promise<Response>
+) {
+  return withAuth(request, async (req, user) => {
+    if (!isAdmin(user)) {
+      return new Response(
+        JSON.stringify({ error: 'Admin access required' }),
+        { status: 403 }
+      );
+    }
+
+    return handler(req, user);
+  });
+}
+```
+
+## API Testing
+
+### Integration Tests
+
+```typescript
+// tests/integration/api/example-api.test.ts
+import { describe, it, expect } from '@jest/globals';
+
+describe('Example API Integration Tests', () => {
+  it('should handle authenticated requests', async () => {
+    const mockSession = {
+      user: { id: 'user_123', email: 'test@example.com' }
+    };
+
+    // Mock authentication
+    jest.mocked(auth.api.getSession).mockResolvedValue(mockSession);
+
+    const response = await GET(mockRequest);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toHaveProperty('data');
+  });
+
+  it('should reject unauthenticated requests', async () => {
+    jest.mocked(auth.api.getSession).mockResolvedValue(null);
+
+    const response = await GET(mockRequest);
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.error).toBe('Unauthorized');
+  });
+});
+```
+
+## Best Practices
+
+### 1. Error Handling
+
+- Always wrap API handlers in try-catch blocks
+- Use consistent error response format
+- Log errors with context information
+- Return appropriate HTTP status codes
+
+### 2. Authentication
+
+- Validate sessions on every protected endpoint
+- Use middleware for common authentication logic
+- Implement proper permission checks
+- Handle authentication errors gracefully
+
+### 3. Input Validation
+
+- Validate all input data
+- Use TypeScript for type safety
+- Implement rate limiting for public endpoints
+- Sanitize user input
+
+### 4. Performance
+
+- Use database connection pooling
+- Implement caching where appropriate
+- Optimize database queries
+- Use streaming for large responses
+
+### 5. Security
+
+- Validate webhook signatures
+- Use HTTPS in production
+- Implement CORS properly
+- Never expose sensitive data in responses
+
+## Common Patterns
+
+### Pagination
+
+```typescript
+export async function getListAction(options: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}) {
+  const { page = 1, limit = 20, search = '' } = options;
+  const offset = (page - 1) * limit;
+
+  const result = await db.select()
+    .from(table)
+    .where(search ? ilike(table.name, `%${search}%`) : undefined)
+    .limit(limit)
+    .offset(offset);
+
+  const total = await db.select({ count: count() })
+    .from(table)
+    .where(search ? ilike(table.name, `%${search}%`) : undefined);
+
+  return {
+    data: result,
+    pagination: {
+      page,
+      limit,
+      total: total[0]?.count || 0,
+      totalPages: Math.ceil((total[0]?.count || 0) / limit),
+    },
+  };
+}
+```
+
+### File Upload
+
+```typescript
+export async function handleFileUpload(
+  file: File,
+  userId: string
+): Promise<FileInfo> {
+  // Validate file
+  const validation = validateFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
+  // Generate unique filename
+  const filename = generateUniqueFilename(file.name);
+  const r2Key = generateR2Key(filename);
+
+  // Upload to storage
+  const uploadResult = await r2Client.upload(r2Key, file);
+  
+  // Save to database
+  const fileRecord = await db.insert(fileTable).values({
+    id: generateId(),
+    filename,
+    originalName: file.name,
+    mimeType: file.type,
+    size: file.size,
+    r2Key,
+    uploadUserId: userId,
+  }).returning();
+
+  return toFileInfo(fileRecord[0]);
+}
+```
+
+This guide provides the foundation for developing robust APIs in Better SaaS. Follow these patterns and best practices to maintain consistency and reliability across your API endpoints. 

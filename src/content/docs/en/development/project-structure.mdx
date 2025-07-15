@@ -1,0 +1,547 @@
+---
+title: Project Structure
+description: Complete guide to Better SaaS project structure, directory organization, and file conventions
+---
+
+# Project Structure
+
+Better SaaS follows a well-organized project structure based on Next.js 15 App Router with clear separation of concerns and modular architecture.
+
+## Overview
+
+The project is structured to support:
+- **Scalable Architecture**: Modular components and clear separation
+- **Type Safety**: TypeScript throughout the entire codebase
+- **Internationalization**: Multi-language support with next-intl
+- **Modern Tooling**: Latest Next.js features and best practices
+- **Testing**: Comprehensive testing setup with multiple levels
+
+## Root Directory Structure
+
+```
+better-saas/
+├── .env.example                 # Environment variables template
+├── .gitignore                   # Git ignore rules
+├── biome.jsonc                  # Code formatting and linting config
+├── components.json              # Shadcn/ui components configuration
+├── drizzle.config.ts           # Database ORM configuration
+├── jest.config.js              # Jest testing configuration
+├── next.config.ts              # Next.js configuration
+├── package.json                # Dependencies and scripts
+├── playwright.config.ts        # E2E testing configuration
+├── postcss.config.js           # PostCSS configuration
+├── README.md                   # Project documentation
+├── source.config.ts            # Fumadocs configuration
+├── tailwind.config.ts          # Tailwind CSS configuration
+├── tsconfig.json               # TypeScript configuration
+├── docs/                       # Documentation files
+├── drizzle/                    # Database migrations
+├── public/                     # Static assets
+├── scripts/                    # Build and utility scripts
+├── src/                        # Source code
+└── tests/                      # Test files
+```
+
+## Source Code Structure (`src/`)
+
+### App Directory (`src/app/`)
+
+Following Next.js 15 App Router conventions:
+
+```
+src/app/
+├── [locale]/                   # Internationalization routing
+│   ├── (home)/                # Home page group
+│   │   ├── blocks/            # Block components showcase
+│   │   ├── blog/              # Blog pages
+│   │   ├── layout.tsx         # Home layout
+│   │   └── page.tsx           # Home page
+│   ├── (protected)/           # Protected routes group
+│   │   ├── dashboard/         # Dashboard pages
+│   │   └── settings/          # Settings pages
+│   ├── docs/                  # Documentation pages
+│   ├── login/                 # Authentication pages
+│   ├── signup/
+│   ├── layout.tsx             # Locale-specific layout
+│   └── page.tsx               # Locale root page
+├── api/                       # API routes
+│   ├── auth/                  # Authentication endpoints
+│   └── webhooks/              # Webhook handlers
+├── layout.tsx                 # Root layout
+└── not-found.tsx              # 404 page
+```
+
+### Components Directory (`src/components/`)
+
+Organized by feature and reusability:
+
+```
+src/components/
+├── ui/                        # Base UI components (shadcn/ui)
+│   ├── button.tsx
+│   ├── card.tsx
+│   ├── input.tsx
+│   └── ...
+├── blocks/                    # Page blocks and sections
+│   ├── hero/
+│   ├── features/
+│   ├── pricing/
+│   ├── navbar/
+│   └── footer/
+├── auth/                      # Authentication components
+│   ├── login-form.tsx
+│   ├── signup-form.tsx
+│   └── permission-provider.tsx
+├── dashboard/                 # Dashboard components
+│   ├── dashboard-content.tsx
+│   ├── dashboard-header.tsx
+│   └── protected-layout-client.tsx
+├── file-manager/              # File management components
+│   ├── file-upload.tsx
+│   ├── file-grid.tsx
+│   └── file-table.tsx
+├── payment/                   # Payment components
+│   ├── subscription-card.tsx
+│   └── checkout-form.tsx
+├── billing/                   # Billing components
+│   └── billing-page.tsx
+├── settings/                  # Settings components
+│   ├── profile-content.tsx
+│   └── security-content.tsx
+├── providers/                 # Context providers
+│   ├── auth-provider.tsx
+│   └── theme-provider.tsx
+└── widget/                    # Reusable widgets
+    ├── language-switcher.tsx
+    ├── theme-toggle.tsx
+    └── user-avatar-menu.tsx
+```
+
+### Configuration Directory (`src/config/`)
+
+Centralized configuration management:
+
+```
+src/config/
+├── app.config.ts              # Application configuration
+├── features.config.ts         # Feature flags and settings
+├── i18n.config.ts            # Internationalization config
+├── navbar.config.ts          # Navigation configuration
+├── payment.config.ts         # Payment plans and pricing
+├── theme.config.ts           # Theme configuration
+└── index.ts                  # Configuration exports
+```
+
+### Library Directory (`src/lib/`)
+
+Utility functions and services:
+
+```
+src/lib/
+├── auth/                      # Authentication utilities
+│   ├── auth.ts               # Server-side auth config
+│   ├── auth-client.ts        # Client-side auth
+│   └── permissions.ts        # Permission system
+├── fumadocs/                 # Documentation system
+│   ├── blog.ts
+│   └── docs.ts
+├── logger/                   # Logging utilities
+│   ├── logger.ts
+│   └── logger-utils.ts
+├── blocks-registry.ts        # Component registry
+├── config-validation.ts     # Configuration validation
+├── file-service.ts          # File management service
+├── r2-client.ts             # Cloud storage client
+└── utils.ts                 # General utilities
+```
+
+### Server Directory (`src/server/`)
+
+Server-side code and database operations:
+
+```
+src/server/
+├── actions/                   # Server Actions
+│   ├── auth-actions.ts
+│   ├── file-actions.ts
+│   ├── user-actions.ts
+│   ├── payment/
+│   │   ├── create-subscription.ts
+│   │   ├── cancel-subscription.ts
+│   │   └── get-billing-info.ts
+│   └── error-messages.ts
+├── db/                        # Database layer
+│   ├── index.ts              # Database connection
+│   ├── schema.ts             # Database schema
+│   ├── types.ts              # Database types
+│   ├── repositories/         # Data access layer
+│   │   ├── base-repository.ts
+│   │   ├── file-repository.ts
+│   │   └── payment-repository.ts
+│   └── services/             # Business logic layer
+│       └── index.ts
+└── middleware/               # Server middleware
+```
+
+### Internationalization (`src/i18n/`)
+
+Multi-language support:
+
+```
+src/i18n/
+├── messages/                  # Translation files
+│   ├── en.json               # English translations
+│   └── zh.json               # Chinese translations
+├── navigation.ts             # Localized navigation
+├── request.ts                # Request configuration
+└── routing.ts                # Routing configuration
+```
+
+### Hooks Directory (`src/hooks/`)
+
+Custom React hooks:
+
+```
+src/hooks/
+├── use-config.ts             # Configuration hooks
+├── use-debounce.ts           # Debounce hook
+├── use-files.ts              # File management hooks
+├── use-login.ts              # Authentication hooks
+├── use-navbar.ts             # Navigation hooks
+├── use-profile.ts            # Profile hooks
+└── use-toast-messages.ts     # Toast notifications
+```
+
+### Types Directory (`src/types/`)
+
+TypeScript type definitions:
+
+```
+src/types/
+├── index.d.ts                # Global type definitions
+├── blocks.ts                 # Block component types
+├── login.ts                  # Authentication types
+├── navbar.ts                 # Navigation types
+├── profile.ts                # Profile types
+└── stripe-extended.ts        # Extended Stripe types
+```
+
+### Content Directory (`src/content/`)
+
+Static content and documentation:
+
+```
+src/content/
+├── blog/                     # Blog posts
+│   ├── en/                   # English blog posts
+│   └── zh/                   # Chinese blog posts
+└── docs/                     # Documentation
+    ├── en/                   # English documentation
+    └── zh/                   # Chinese documentation
+```
+
+## Testing Structure (`tests/`)
+
+Comprehensive testing setup:
+
+```
+tests/
+├── __mocks__/                # Mock files
+├── e2e/                      # End-to-end tests
+│   ├── auth/
+│   ├── dashboard/
+│   ├── payment/
+│   └── fixtures/
+├── integration/              # Integration tests
+│   ├── api/
+│   ├── database/
+│   └── services/
+├── unit/                     # Unit tests
+│   ├── components/
+│   ├── hooks/
+│   ├── lib/
+│   └── server/
+├── setup/                    # Test setup files
+└── utils/                    # Test utilities
+```
+
+## File Naming Conventions
+
+### Components
+- **React Components**: PascalCase (e.g., `UserProfile.tsx`)
+- **Component Files**: kebab-case (e.g., `user-profile.tsx`)
+- **Hook Files**: kebab-case with `use-` prefix (e.g., `use-user-profile.ts`)
+
+### API Routes
+- **Route Files**: `route.ts` in directory structure
+- **Middleware**: `middleware.ts`
+- **Server Actions**: kebab-case with `-actions` suffix
+
+### Configuration
+- **Config Files**: kebab-case with `.config.ts` suffix
+- **Environment**: `.env.local`, `.env.example`
+
+### Database
+- **Schema Files**: `schema.ts`
+- **Migration Files**: Timestamp prefix (e.g., `0001_initial.sql`)
+- **Repository Files**: kebab-case with `-repository` suffix
+
+## Import/Export Conventions
+
+### Barrel Exports
+Use index files for clean imports:
+
+```typescript
+// src/components/ui/index.ts
+export { Button } from './button'
+export { Card } from './card'
+export { Input } from './input'
+
+// Usage
+import { Button, Card, Input } from '@/components/ui'
+```
+
+### Path Mapping
+Configured in `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/hooks/*": ["./src/hooks/*"],
+      "@/types/*": ["./src/types/*"],
+      "@/config/*": ["./src/config/*"]
+    }
+  }
+}
+```
+
+### Import Order
+Follow this import order:
+
+```typescript
+// 1. React and Next.js imports
+import React from 'react'
+import { NextRequest, NextResponse } from 'next/server'
+
+// 2. Third-party libraries
+import { z } from 'zod'
+import { clsx } from 'clsx'
+
+// 3. Internal imports (absolute paths)
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/use-auth'
+import { db } from '@/server/db'
+
+// 4. Relative imports
+import './styles.css'
+```
+
+## Code Organization Principles
+
+### Single Responsibility
+Each file should have a single, well-defined purpose:
+
+```typescript
+// Good: Focused on user authentication
+// src/lib/auth/auth-client.ts
+export const authClient = createAuthClient({...})
+
+// Good: Focused on file operations
+// src/lib/file-service.ts
+export class FileService {
+  async uploadFile() {...}
+  async deleteFile() {...}
+}
+```
+
+### Dependency Direction
+Dependencies should flow inward:
+
+```
+UI Components → Hooks → Services → Database
+```
+
+### Feature-Based Organization
+Group related functionality together:
+
+```
+src/features/
+├── auth/
+│   ├── components/
+│   ├── hooks/
+│   ├── services/
+│   └── types/
+├── files/
+│   ├── components/
+│   ├── hooks/
+│   ├── services/
+│   └── types/
+└── billing/
+    ├── components/
+    ├── hooks/
+    ├── services/
+    └── types/
+```
+
+## Environment Configuration
+
+### Environment Files
+- `.env.local` - Local development (not committed)
+- `.env.example` - Template for environment variables
+- `.env.production` - Production environment variables
+
+### Environment Variables Structure
+```
+# Database
+DATABASE_URL=postgresql://...
+
+# Authentication
+BETTER_AUTH_SECRET=...
+BETTER_AUTH_URL=...
+
+# OAuth Providers
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+
+# Payment
+STRIPE_SECRET_KEY=...
+STRIPE_PUBLISHABLE_KEY=...
+
+# File Storage
+CLOUDFLARE_R2_ACCESS_KEY_ID=...
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
+
+# External Services
+RESEND_API_KEY=...
+```
+
+## Build and Development Scripts
+
+### Package.json Scripts
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "biome check .",
+    "lint:fix": "biome check . --apply",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:integration": "jest --config=jest.integration.config.js",
+    "test:e2e": "playwright test",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
+  }
+}
+```
+
+## Performance Considerations
+
+### Code Splitting
+- Use dynamic imports for large components
+- Implement route-based code splitting
+- Lazy load non-critical features
+
+### Bundle Analysis
+```bash
+# Analyze bundle size
+npm run build -- --analyze
+
+# Check bundle composition
+npx @next/bundle-analyzer
+```
+
+### Tree Shaking
+- Use ES modules for better tree shaking
+- Avoid importing entire libraries
+- Use barrel exports judiciously
+
+## Security Considerations
+
+### File Organization
+- Keep sensitive configuration in environment variables
+- Separate client and server code clearly
+- Use TypeScript for type safety
+
+### API Security
+- Validate all inputs with Zod schemas
+- Implement proper authentication checks
+- Use CSRF protection for forms
+
+## Documentation Standards
+
+### Code Comments
+```typescript
+/**
+ * Uploads a file to cloud storage with validation and processing
+ * @param file - The file to upload
+ * @param userId - The user ID for ownership
+ * @param options - Upload options
+ * @returns Promise with upload result
+ */
+async function uploadFile(
+  file: File,
+  userId: string,
+  options?: UploadOptions
+): Promise<UploadResult> {
+  // Implementation
+}
+```
+
+### README Structure
+Each feature directory should include:
+- Purpose and overview
+- API documentation
+- Usage examples
+- Testing instructions
+
+## Migration and Refactoring
+
+### Adding New Features
+1. Create feature directory structure
+2. Implement core functionality
+3. Add tests
+4. Update documentation
+5. Add to configuration
+
+### Removing Features
+1. Remove from configuration
+2. Remove components and hooks
+3. Clean up database schema
+4. Remove tests
+5. Update documentation
+
+## Best Practices
+
+### Component Design
+- Keep components small and focused
+- Use composition over inheritance
+- Implement proper prop validation
+- Follow accessibility guidelines
+
+### State Management
+- Use React hooks for local state
+- Implement proper error boundaries
+- Use server state for data fetching
+- Minimize global state
+
+### Performance
+- Implement proper loading states
+- Use React.memo for expensive components
+- Optimize images and assets
+- Implement proper caching strategies
+
+## Next Steps
+
+- Review [Configuration](./configuration) for detailed setup
+- Explore [Database Schema](./database-schema) for data modeling
+- Check [API Routes](./api-routes) for backend development
+- Learn about [Components](./components) for UI development 

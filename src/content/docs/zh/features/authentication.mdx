@@ -1,0 +1,868 @@
+---
+title: 认证系统
+---
+Better SaaS 具有基于 Better Auth 构建的强大认证系统，支持多个 OAuth 提供商、基于角色的访问控制和安全的会话管理。
+
+## 概述
+
+认证系统提供：
+- **多提供商 OAuth**: GitHub、Google 和自定义提供商
+- **基于角色的访问控制**: 管理员、用户和自定义角色
+- **会话管理**: 使用 Redis 的安全会话处理
+- **密码安全**: Bcrypt 哈希和安全最佳实践
+- **账户关联**: 将多个 OAuth 账户关联到一个用户
+- **邮箱验证**: 可选的邮箱验证工作流
+
+## Better Auth 配置
+
+### 核心配置
+
+认证配置位于 `src/lib/auth/auth.ts`：
+
+```typescript
+import { betterAuth } from "better-auth"
+import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { db } from "@/server/db"
+import { 
+  users, 
+  sessions, 
+  accounts, 
+  verificationTokens 
+} from "@/server/db/schema"
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
+      users,
+      sessions,
+      accounts,
+      verificationTokens,
+    },
+  }),
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false,
+  },
+  socialProviders: {
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    },
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    },
+  },
+  session: {
+    expiresIn: 60 * 60 * 24 * 7, // 7 天
+    updateAge: 60 * 60 * 24, // 24 小时
+  },
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        defaultValue: "user",
+      },
+      isActive: {
+        type: "boolean",
+        defaultValue: true,
+      },
+    },
+  },
+  plugins: [
+    // 在此添加自定义插件
+  ],
+})
+
+export type Session = typeof auth.$Infer.Session
+export type User = typeof auth.$Infer.User
+```
+
+### 客户端配置
+
+客户端配置位于 `src/lib/auth/auth-client.ts`：
+
+```typescript
+import { createAuthClient } from "better-auth/react"
+import { inferAdditionalFields } from "better-auth/client/plugins"
+
+export const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_AUTH_URL || "http://localhost:3000",
+  plugins: [
+    inferAdditionalFields<{
+      role: string
+      isActive: boolean
+    }>(),
+  ],
+})
+
+export const {
+  signIn,
+  signOut,
+  signUp,
+  useSession,
+  getSession,
+} = authClient
+```
+
+## 数据库架构
+
+### 用户架构
+
+```typescript
+// src/server/db/schema.ts
+export const users = pgTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  email: text("email").unique().notNull(),
+  emailVerified: timestamp("emailVerified", { mode: "date" }),
+  image: text("image"),
+  role: text("role").default("user").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const sessions = pgTable("sessions", {
+  id: text("id").primaryKey(),
+  sessionToken: text("sessionToken").unique().notNull(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const accounts = pgTable("accounts", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  provider: text("provider").notNull(),
+  providerAccountId: text("providerAccountId").notNull(),
+  refresh_token: text("refresh_token"),
+  access_token: text("access_token"),
+  expires_at: integer("expires_at"),
+  token_type: text("token_type"),
+  scope: text("scope"),
+  id_token: text("id_token"),
+  session_state: text("session_state"),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+})
+```
+
+## OAuth 提供商
+
+### GitHub OAuth 设置
+
+1. **创建 GitHub OAuth 应用**：
+   - 转到 GitHub 设置 > 开发者设置 > OAuth 应用
+   - 创建新的 OAuth 应用
+   - 设置授权回调 URL：`https://yourdomain.com/api/auth/callback/github`
+
+2. **环境变量**：
+   ```
+   GITHUB_CLIENT_ID=your_github_client_id
+   GITHUB_CLIENT_SECRET=your_github_client_secret
+   ```
+
+3. **在组件中使用**：
+   ```tsx
+   import { signIn } from "@/lib/auth/auth-client"
+
+   export function GitHubSignIn() {
+     const handleSignIn = async () => {
+       await signIn.social({
+         provider: "github",
+         callbackURL: "/dashboard",
+       })
+     }
+
+     return (
+       <button onClick={handleSignIn}>
+         使用 GitHub 登录
+       </button>
+     )
+   }
+   ```
+
+### Google OAuth 设置
+
+1. **创建 Google OAuth 凭据**：
+   - 转到 Google Cloud Console
+   - 创建 OAuth 2.0 客户端 ID
+   - 添加授权重定向 URI：`https://yourdomain.com/api/auth/callback/google`
+
+2. **环境变量**：
+   ```
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   ```
+
+3. **在组件中使用**：
+   ```tsx
+   import { signIn } from "@/lib/auth/auth-client"
+
+   export function GoogleSignIn() {
+     const handleSignIn = async () => {
+       await signIn.social({
+         provider: "google",
+         callbackURL: "/dashboard",
+       })
+     }
+
+     return (
+       <button onClick={handleSignIn}>
+         使用 Google 登录
+       </button>
+     )
+   }
+   ```
+
+## 基于角色的访问控制
+
+### 权限系统
+
+在 `src/lib/auth/permissions.ts` 中定义权限：
+
+```typescript
+export const ROLES = {
+  ADMIN: "admin",
+  USER: "user",
+  MODERATOR: "moderator",
+} as const
+
+export type Role = typeof ROLES[keyof typeof ROLES]
+
+export const PERMISSIONS = {
+  // 用户权限
+  READ_PROFILE: "read:profile",
+  UPDATE_PROFILE: "update:profile",
+  
+  // 管理员权限
+  MANAGE_USERS: "manage:users",
+  MANAGE_SETTINGS: "manage:settings",
+  VIEW_ANALYTICS: "view:analytics",
+  
+  // 文件权限
+  UPLOAD_FILES: "upload:files",
+  DELETE_FILES: "delete:files",
+  
+  // 支付权限
+  MANAGE_SUBSCRIPTIONS: "manage:subscriptions",
+  VIEW_BILLING: "view:billing",
+} as const
+
+export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS]
+
+export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+  [ROLES.USER]: [
+    PERMISSIONS.READ_PROFILE,
+    PERMISSIONS.UPDATE_PROFILE,
+    PERMISSIONS.UPLOAD_FILES,
+    PERMISSIONS.VIEW_BILLING,
+  ],
+  [ROLES.MODERATOR]: [
+    PERMISSIONS.READ_PROFILE,
+    PERMISSIONS.UPDATE_PROFILE,
+    PERMISSIONS.UPLOAD_FILES,
+    PERMISSIONS.DELETE_FILES,
+    PERMISSIONS.VIEW_BILLING,
+  ],
+  [ROLES.ADMIN]: [
+    PERMISSIONS.READ_PROFILE,
+    PERMISSIONS.UPDATE_PROFILE,
+    PERMISSIONS.UPLOAD_FILES,
+    PERMISSIONS.DELETE_FILES,
+    PERMISSIONS.MANAGE_USERS,
+    PERMISSIONS.MANAGE_SETTINGS,
+    PERMISSIONS.VIEW_ANALYTICS,
+    PERMISSIONS.MANAGE_SUBSCRIPTIONS,
+    PERMISSIONS.VIEW_BILLING,
+  ],
+}
+
+export function hasPermission(role: Role, permission: Permission): boolean {
+  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
+}
+
+export function hasAnyPermission(role: Role, permissions: Permission[]): boolean {
+  return permissions.some(permission => hasPermission(role, permission))
+}
+```
+
+### 权限钩子
+
+在 `src/hooks/use-permissions.ts` 中创建权限钩子：
+
+```typescript
+import { useSession } from "@/lib/auth/auth-client"
+import { hasPermission, hasAnyPermission, type Permission, type Role } from "@/lib/auth/permissions"
+
+export function usePermissions() {
+  const { data: session } = useSession()
+  const userRole = session?.user?.role as Role
+
+  const checkPermission = (permission: Permission): boolean => {
+    if (!userRole) return false
+    return hasPermission(userRole, permission)
+  }
+
+  const checkAnyPermission = (permissions: Permission[]): boolean => {
+    if (!userRole) return false
+    return hasAnyPermission(userRole, permissions)
+  }
+
+  return {
+    hasPermission: checkPermission,
+    hasAnyPermission: checkAnyPermission,
+    role: userRole,
+    isAdmin: userRole === "admin",
+    isUser: userRole === "user",
+    isModerator: userRole === "moderator",
+  }
+}
+```
+
+## 认证组件
+
+### 登录表单
+
+```tsx
+// src/components/blocks/login/login-form.tsx
+"use client"
+
+import { useState } from "react"
+import { signIn } from "@/lib/auth/auth-client"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
+export function LoginForm() {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
+
+    try {
+      await signIn.email({
+        email,
+        password,
+        callbackURL: "/dashboard",
+      })
+    } catch (err) {
+      setError("邮箱或密码无效")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSocialSignIn = async (provider: "github" | "google") => {
+    setIsLoading(true)
+    try {
+      await signIn.social({
+        provider,
+        callbackURL: "/dashboard",
+      })
+    } catch (err) {
+      setError(`使用 ${provider} 登录失败`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>登录</CardTitle>
+        <CardDescription>
+          输入您的凭据以访问您的账户
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <form onSubmit={handleEmailSignIn} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">邮箱</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">密码</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "登录中..." : "登录"}
+          </Button>
+        </form>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              或继续使用
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Button
+            variant="outline"
+            onClick={() => handleSocialSignIn("github")}
+            disabled={isLoading}
+          >
+            GitHub
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handleSocialSignIn("google")}
+            disabled={isLoading}
+          >
+            Google
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### 注册表单
+
+```tsx
+// src/components/blocks/signup/signup-form.tsx
+"use client"
+
+import { useState } from "react"
+import { signUp } from "@/lib/auth/auth-client"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
+export function SignUpForm() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  })
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("密码不匹配")
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      await signUp.email({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        callbackURL: "/dashboard",
+      })
+    } catch (err) {
+      setError("创建账户失败")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>创建账户</CardTitle>
+        <CardDescription>
+          输入您的信息以创建新账户
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">姓名</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">邮箱</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">密码</Label>
+            <Input
+              id="password"
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">确认密码</Label>
+            <Input
+              id="confirmPassword"
+              type="password"
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              required
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "创建账户中..." : "创建账户"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+## 路由保护
+
+### 认证守卫组件
+
+```tsx
+// src/components/auth-guard.tsx
+"use client"
+
+import { useSession } from "@/lib/auth/auth-client"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { LoadingSkeleton } from "@/components/loading-skeleton"
+
+interface AuthGuardProps {
+  children: React.ReactNode
+  requireAuth?: boolean
+  requiredRole?: string
+  fallbackUrl?: string
+}
+
+export function AuthGuard({ 
+  children, 
+  requireAuth = true, 
+  requiredRole,
+  fallbackUrl = "/login" 
+}: AuthGuardProps) {
+  const { data: session, isPending } = useSession()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (isPending) return
+
+    if (requireAuth && !session) {
+      router.push(fallbackUrl)
+      return
+    }
+
+    if (requiredRole && session?.user?.role !== requiredRole) {
+      router.push("/unauthorized")
+      return
+    }
+  }, [session, isPending, requireAuth, requiredRole, router, fallbackUrl])
+
+  if (isPending) {
+    return <LoadingSkeleton />
+  }
+
+  if (requireAuth && !session) {
+    return null
+  }
+
+  if (requiredRole && session?.user?.role !== requiredRole) {
+    return null
+  }
+
+  return <>{children}</>
+}
+```
+
+### 管理员守卫组件
+
+```tsx
+// src/components/admin-guard.tsx
+"use client"
+
+import { usePermissions } from "@/hooks/use-permissions"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { LoadingSkeleton } from "@/components/loading-skeleton"
+
+interface AdminGuardProps {
+  children: React.ReactNode
+  fallbackUrl?: string
+}
+
+export function AdminGuard({ children, fallbackUrl = "/dashboard" }: AdminGuardProps) {
+  const { isAdmin, role } = usePermissions()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (role && !isAdmin) {
+      router.push(fallbackUrl)
+    }
+  }, [isAdmin, role, router, fallbackUrl])
+
+  if (!role) {
+    return <LoadingSkeleton />
+  }
+
+  if (!isAdmin) {
+    return null
+  }
+
+  return <>{children}</>
+}
+```
+
+## 会话管理
+
+### 会话提供者
+
+```tsx
+// src/components/providers/auth-provider.tsx
+"use client"
+
+import { SessionProvider } from "@/lib/auth/auth-client"
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  return <SessionProvider>{children}</SessionProvider>
+}
+```
+
+### 会话钩子使用
+
+```tsx
+// 使用会话的示例组件
+"use client"
+
+import { useSession } from "@/lib/auth/auth-client"
+import { signOut } from "@/lib/auth/auth-client"
+
+export function UserProfile() {
+  const { data: session, isPending } = useSession()
+
+  if (isPending) return <div>加载中...</div>
+  if (!session) return <div>未认证</div>
+
+  return (
+    <div>
+      <h1>欢迎，{session.user.name}！</h1>
+      <p>邮箱：{session.user.email}</p>
+      <p>角色：{session.user.role}</p>
+      <button onClick={() => signOut()}>
+        登出
+      </button>
+    </div>
+  )
+}
+```
+
+## 服务器操作
+
+### 认证操作
+
+```typescript
+// src/server/actions/auth-actions.ts
+"use server"
+
+import { auth } from "@/lib/auth/auth"
+import { db } from "@/server/db"
+import { users } from "@/server/db/schema"
+import { eq } from "drizzle-orm"
+import { revalidatePath } from "next/cache"
+
+export async function updateUserRole(userId: string, newRole: string) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session || session.user.role !== "admin") {
+    throw new Error("未授权")
+  }
+
+  await db
+    .update(users)
+    .set({ role: newRole })
+    .where(eq(users.id, userId))
+
+  revalidatePath("/admin/users")
+}
+
+export async function deactivateUser(userId: string) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session || session.user.role !== "admin") {
+    throw new Error("未授权")
+  }
+
+  await db
+    .update(users)
+    .set({ isActive: false })
+    .where(eq(users.id, userId))
+
+  revalidatePath("/admin/users")
+}
+```
+
+## 安全最佳实践
+
+### 环境变量
+
+```
+# Better Auth 必需
+BETTER_AUTH_SECRET=your-super-secret-key-here
+BETTER_AUTH_URL=https://yourdomain.com
+
+# OAuth 提供商
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# 数据库
+DATABASE_URL=postgresql://user:password@localhost:5432/bettersaas
+```
+
+### 安全头
+
+```typescript
+// next.config.ts
+const securityHeaders = [
+  {
+    key: 'X-Frame-Options',
+    value: 'DENY'
+  },
+  {
+    key: 'X-Content-Type-Options',
+    value: 'nosniff'
+  },
+  {
+    key: 'Referrer-Policy',
+    value: 'strict-origin-when-cross-origin'
+  }
+]
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: securityHeaders,
+      },
+    ]
+  },
+}
+```
+
+## 测试认证
+
+### 单元测试
+
+```typescript
+// src/lib/auth/permissions.test.ts
+import { describe, it, expect } from 'vitest'
+import { hasPermission, ROLES, PERMISSIONS } from './permissions'
+
+describe('权限系统', () => {
+  it('应该授予管理员所有权限', () => {
+    expect(hasPermission(ROLES.ADMIN, PERMISSIONS.MANAGE_USERS)).toBe(true)
+    expect(hasPermission(ROLES.ADMIN, PERMISSIONS.VIEW_ANALYTICS)).toBe(true)
+  })
+
+  it('应该限制用户权限', () => {
+    expect(hasPermission(ROLES.USER, PERMISSIONS.MANAGE_USERS)).toBe(false)
+    expect(hasPermission(ROLES.USER, PERMISSIONS.READ_PROFILE)).toBe(true)
+  })
+})
+```
+
+### 集成测试
+
+```typescript
+// tests/integration/auth.test.ts
+import { describe, it, expect } from 'vitest'
+import { testClient } from '../utils/test-client'
+
+describe('认证 API', () => {
+  it('应该创建用户账户', async () => {
+    const response = await testClient.post('/api/auth/signup', {
+      email: 'test@example.com',
+      password: 'password123',
+      name: 'Test User'
+    })
+
+    expect(response.status).toBe(201)
+    expect(response.data.user.email).toBe('test@example.com')
+  })
+
+  it('应该登录用户', async () => {
+    const response = await testClient.post('/api/auth/signin', {
+      email: 'test@example.com',
+      password: 'password123'
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.data.user).toBeDefined()
+  })
+})
+```
+
+## 故障排除
+
+### 常见问题
+
+1. **OAuth 回调错误**
+   - 验证 OAuth 提供商设置中的回调 URL
+   - 检查环境变量是否正确设置
+   - 确保 BETTER_AUTH_URL 与您的域名匹配
+
+2. **会话不持久**
+   - 检查数据库连接
+   - 验证会话表是否存在
+   - 如果使用 Redis 会话，检查 Redis 连接
+
+3. **权限被拒绝**
+   - 验证数据库中的用户角色
+   - 检查权限配置
+   - 确保认证中间件正确配置

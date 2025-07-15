@@ -1,156 +1,427 @@
 ---
 title: Quick Start
+description: Get your Better SaaS project up and running in 5 minutes
 ---
 
-## Introduction
+# Quick Start Guide
 
-Get your Better SaaS project up and running in minutes. This guide will walk you through the complete setup process from installation to running your first SaaS application.
+Get your Better SaaS project up and running in **5 minutes**! This guide will walk you through the complete setup process from installation to running your first SaaS application.
 
-## Prerequisites
+## 🚀 Overview
+
+By the end of this guide, you'll have:
+- ✅ A fully functional SaaS application running locally
+- ✅ Authentication system with login/signup
+- ✅ Database configured and running
+- ✅ Payment system ready for testing
+- ✅ File management system operational
+- ✅ Multi-language support enabled
+
+## 📋 Prerequisites
 
 Before you begin, ensure you have the following installed on your system:
 
+### Required Software
 - **Node.js 18+** - [Download Node.js](https://nodejs.org/)
 - **pnpm** - Package manager (`npm install -g pnpm`)
-- **PostgreSQL** - Database server
-- **Git** - Version control system
+- **PostgreSQL** - Database server ([Download PostgreSQL](https://www.postgresql.org/download/))
+- **Git** - Version control system ([Download Git](https://git-scm.com/))
 
-### Optional Services
+### Optional Services (for full functionality)
+- **Stripe Account** - For payment processing ([Sign up](https://stripe.com/))
+- **Cloudflare R2** or **AWS S3** - For file storage
+- **GitHub OAuth App** - For social authentication
+- **Google OAuth App** - For social authentication
 
-For full functionality, you'll also need:
+## ⚡ 5-Minute Setup
 
-- **Stripe Account** - For payment processing
-- **AWS S3 or Cloudflare R2** - For file storage
-- **GitHub/Google OAuth Apps** - For social authentication
-
-## Installation
-
-### 1. Clone the Repository
+### Step 1: Clone the Repository
 
 ```bash
+# Clone the repository
 git clone <repository-url>
+cd better-saas
+
+# Or use GitHub CLI
+gh repo clone <repository-url>
 cd better-saas
 ```
 
-### 2. Install Dependencies
+### Step 2: Install Dependencies
 
 ```bash
+# Install all dependencies
 pnpm install
+
+# This will install:
+# - Next.js 15 and React 18
+# - TypeScript and all type definitions
+# - Tailwind CSS and UI components
+# - Database tools (Drizzle ORM)
+# - Testing frameworks (Jest, Playwright)
+# - And all other project dependencies
 ```
 
-### 3. Environment Configuration
-
-Copy the environment example file and configure it:
+### Step 3: Environment Configuration
 
 ```bash
+# Copy the environment template
 cp env.example .env
+
+# Open the .env file in your editor
+code .env  # VS Code
+# or
+nano .env  # Terminal editor
 ```
 
-Edit the `.env` file with your configuration:
+**Configure the essential environment variables:**
 
-```
-# App URL
+```bash
+# App Configuration
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
-# Database
-DATABASE_URL="postgresql://user:password@localhost:5432/database"
+# Database (Required)
+DATABASE_URL="postgresql://username:password@localhost:5432/better_saas"
 
-# Auth
-BETTER_AUTH_SECRET="your-secret-key"
-
-# OAuth Providers (optional)
-GITHUB_CLIENT_ID="your-github-client-id"
-GITHUB_CLIENT_SECRET="your-github-client-secret"
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
-
-# File Storage (optional)
-R2_BUCKET_NAME="your-bucket-name"
-R2_ACCESS_KEY_ID="your-access-key-id"
-R2_SECRET_ACCESS_KEY="your-secret-access-key"
-R2_ENDPOINT="https://your-account-id.r2.cloudflarestorage.com"
-R2_PUBLIC_URL="https://your-domain.com"
-
-# Stripe Payment (optional)
-STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key"
-STRIPE_WEBHOOK_SECRET="whsec_your_webhook_secret"
-NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY="price_xxx"
-NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY="price_xxx"
+# Authentication (Required)
+BETTER_AUTH_SECRET="your-super-secret-key-here"
 
 # Admin Configuration
 ADMIN_EMAILS="admin@example.com"
 ```
 
-### 4. Database Setup
-
-Initialize your database with the required schema:
+### Step 4: Database Setup
 
 ```bash
+# Create the database (if using PostgreSQL locally)
+createdb better_saas
+
+# Push the database schema
 pnpm db:push
+
+# This will:
+# - Create all necessary tables
+# - Set up relationships
+# - Initialize the database structure
 ```
 
-### 5. Start Development Server
-
-Launch the development server:
+### Step 5: Start the Development Server
 
 ```bash
+# Start the development server
+pnpm dev
+
+# The application will be available at:
+# http://localhost:3000
+```
+
+🎉 **Congratulations!** Your Better SaaS application is now running!
+
+## 🔧 Complete Configuration
+
+For full functionality, configure these additional services:
+
+### Payment Integration (Stripe)
+
+1. **Create a Stripe account** at [stripe.com](https://stripe.com/)
+2. **Get your API keys** from the Stripe dashboard
+3. **Add to your `.env` file:**
+
+```bash
+# Stripe Configuration
+STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key"
+STRIPE_WEBHOOK_SECRET="whsec_your_webhook_secret"
+NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY="price_monthly_id"
+NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY="price_yearly_id"
+```
+
+4. **Create products and prices** in your Stripe dashboard
+5. **Set up webhook endpoints** for payment events
+
+### File Storage (Cloudflare R2)
+
+1. **Create a Cloudflare account** and set up R2
+2. **Create a storage bucket**
+3. **Add to your `.env` file:**
+
+```bash
+# Cloudflare R2 Configuration
+R2_BUCKET_NAME="your-bucket-name"
+R2_ACCESS_KEY_ID="your-access-key-id"
+R2_SECRET_ACCESS_KEY="your-secret-access-key"
+R2_ENDPOINT="https://your-account-id.r2.cloudflarestorage.com"
+R2_PUBLIC_URL="https://your-domain.com"
+```
+
+### Social Authentication
+
+#### GitHub OAuth
+
+1. **Create a GitHub OAuth App:**
+   - Go to GitHub Settings → Developer settings → OAuth Apps
+   - Create a new OAuth App
+   - Set Authorization callback URL to: `http://localhost:3000/api/auth/callback/github`
+
+2. **Add to your `.env` file:**
+
+```bash
+# GitHub OAuth
+GITHUB_CLIENT_ID="your-github-client-id"
+GITHUB_CLIENT_SECRET="your-github-client-secret"
+```
+
+#### Google OAuth
+
+1. **Create a Google OAuth App:**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing
+   - Enable Google+ API
+   - Create OAuth 2.0 credentials
+   - Set redirect URI to: `http://localhost:3000/api/auth/callback/google`
+
+2. **Add to your `.env` file:**
+
+```bash
+# Google OAuth
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+```
+
+## 🎯 Explore Your Application
+
+### 1. Authentication System
+
+Visit `http://localhost:3000/login` to test:
+- ✅ **Email/Password Login** - Create an account and sign in
+- ✅ **Social Login** - Try GitHub or Google authentication
+- ✅ **Password Reset** - Test the password reset flow
+- ✅ **User Registration** - Create new user accounts
+
+### 2. Dashboard Features
+
+Access the dashboard at `http://localhost:3000/dashboard`:
+- ✅ **User Dashboard** - Personal user interface
+- ✅ **Admin Dashboard** - Administrative controls (for admin users)
+- ✅ **File Management** - Upload and manage files
+- ✅ **User Management** - Admin user management interface
+
+### 3. Payment System
+
+Test the payment flow at `http://localhost:3000/pricing`:
+- ✅ **Subscription Plans** - View available pricing plans
+- ✅ **Payment Processing** - Test with Stripe test cards
+- ✅ **Billing Management** - Manage subscriptions and invoices
+- ✅ **Customer Portal** - Self-service billing portal
+
+### 4. File Management
+
+Try file operations at `http://localhost:3000/dashboard/files`:
+- ✅ **File Upload** - Drag and drop file uploads
+- ✅ **Image Processing** - Automatic thumbnail generation
+- ✅ **File Organization** - Organize and manage files
+- ✅ **Access Control** - File permissions and sharing
+
+### 5. Internationalization
+
+Test language switching:
+- ✅ **Language Toggle** - Switch between English and Chinese
+- ✅ **Localized Content** - All UI text is translated
+- ✅ **Localized Routes** - URLs change based on language
+- ✅ **Date/Currency Format** - Proper localization formatting
+
+## 🛠️ Development Commands
+
+Here are the essential commands for development:
+
+### Development Server
+```bash
+# Start development server with hot reload
+pnpm dev
+
+# Start with specific port
+pnpm dev -- --port 3001
+
+# Start with turbo mode (faster builds)
+pnpm dev --turbo
+```
+
+### Database Operations
+```bash
+# Push schema changes to database
+pnpm db:push
+
+# Generate database migrations
+pnpm db:generate
+
+# Run database migrations
+pnpm db:migrate
+
+# Open database studio (GUI)
+pnpm db:studio
+```
+
+### Code Quality
+```bash
+# Run TypeScript type checking
+pnpm typecheck
+
+# Run code formatting and linting
+pnpm check
+
+# Fix code formatting issues
+pnpm check:write
+```
+
+### Testing
+```bash
+# Run all tests
+pnpm test
+
+# Run unit tests only
+pnpm test:unit
+
+# Run integration tests
+pnpm test:integration
+
+# Run end-to-end tests
+pnpm test:e2e
+
+# Run tests with coverage
+pnpm test:coverage
+```
+
+### Build and Production
+```bash
+# Build for production
+pnpm build
+
+# Start production server
+pnpm start
+
+# Build and start (combined)
+pnpm preview
+```
+
+## 🔍 Verification Checklist
+
+Verify your setup is working correctly:
+
+### ✅ Basic Functionality
+- [ ] Application loads at `http://localhost:3000`
+- [ ] No console errors in browser developer tools
+- [ ] Database connection is working
+- [ ] Environment variables are loaded correctly
+
+### ✅ Authentication
+- [ ] User registration works
+- [ ] Email/password login works
+- [ ] Social login works (if configured)
+- [ ] Protected routes redirect to login
+- [ ] User sessions persist correctly
+
+### ✅ Database
+- [ ] Database tables are created
+- [ ] User data is stored correctly
+- [ ] Database studio opens without errors
+- [ ] Migrations run successfully
+
+### ✅ File System
+- [ ] File uploads work
+- [ ] Images are processed correctly
+- [ ] Files are stored in configured location
+- [ ] File permissions work correctly
+
+### ✅ Payment System (if configured)
+- [ ] Stripe integration works
+- [ ] Test payments process correctly
+- [ ] Webhook endpoints receive events
+- [ ] Subscription management works
+
+## 🚨 Common Issues & Solutions
+
+### Database Connection Issues
+
+**Problem:** `Database connection failed`
+```bash
+# Check if PostgreSQL is running
+brew services start postgresql  # macOS
+sudo systemctl start postgresql  # Linux
+net start postgresql-x64-14     # Windows
+
+# Verify connection string
+psql "postgresql://username:password@localhost:5432/better_saas"
+```
+
+### Environment Variables Not Loading
+
+**Problem:** Environment variables are undefined
+```bash
+# Make sure .env file is in the root directory
+ls -la .env
+
+# Check file permissions
+chmod 644 .env
+
+# Restart the development server
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to see your application running.
+### Port Already in Use
 
-## Key Features
+**Problem:** `Port 3000 is already in use`
+```bash
+# Find and kill process using port 3000
+lsof -ti:3000 | xargs kill -9
 
-Your Better SaaS application includes:
+# Or use a different port
+pnpm dev -- --port 3001
+```
 
-- **🔐 Authentication** - Email/password and social login with Better Auth
-- **💳 Payments** - Stripe integration with subscription management
-- **📁 File Management** - Upload and manage files with cloud storage
-- **🌍 Internationalization** - Multi-language support (English/Chinese)
-- **📱 Responsive Design** - Modern UI with Radix UI and Tailwind CSS
-- **📖 Documentation** - Built-in docs system with Fumadocs
-- **🔒 Protected Routes** - Role-based access control
-- **👥 Admin Dashboard** - User management and system administration
+### Node.js Version Issues
 
-## Available Scripts
+**Problem:** `Node.js version not supported`
+```bash
+# Check your Node.js version
+node --version
 
-### Development
-- `pnpm dev` - Start development server
-- `pnpm build` - Build for production
-- `pnpm start` - Start production server
+# Update to Node.js 18+
+nvm install 18
+nvm use 18
+```
 
-### Code Quality
-- `pnpm check` - Run code quality checks
-- `pnpm check:write` - Fix code quality issues
-- `pnpm typecheck` - Run TypeScript checks
+## 📚 Next Steps
 
-### Database
-- `pnpm db:generate` - Generate database migrations
-- `pnpm db:migrate` - Run database migrations
-- `pnpm db:push` - Push schema changes to database
-- `pnpm db:studio` - Open database studio
+Now that your application is running, here's what to do next:
 
-### Testing
-- `pnpm test` - Run all tests
-- `pnpm test:unit` - Run unit tests
-- `pnpm test:integration` - Run integration tests
-- `pnpm test:e2e` - Run end-to-end tests
+### 1. **Explore the Features**
+- Read the [Architecture Guide](/docs/architecture) to understand the system design
+- Check out the [Features Documentation](/docs/features) for detailed feature explanations
 
-### Admin
-- `pnpm admin:setup` - Set up admin user account
+### 2. **Customize Your Application**
+- Follow the [Customization Guide](/docs/customization) to make it your own
+- Update branding, colors, and content to match your needs
 
-## Next Steps
+### 3. **Add Your Content**
+- Replace placeholder content with your own
+- Configure your pricing plans and features
+- Set up your domain and branding
 
-1. **Explore the Application** - Navigate through the dashboard and features
-2. **Configure Services** - Set up Stripe, OAuth providers, and file storage
-3. **Customize Content** - Update the homepage, pricing, and documentation
-4. **Deploy** - Follow the deployment guide to publish your application
+### 4. **Deploy to Production**
+- Follow the [Deployment Guide](/docs/deployment) for production setup
+- Configure production environment variables
+- Set up monitoring and analytics
 
-## Need Help?
+### 5. **Learn the Codebase**
+- Read the [Development Guide](/docs/development) for coding guidelines
+- Explore the [API Documentation](/docs/api) for backend integration
+- Check out the [Testing Guide](/docs/testing) for testing strategies
 
-- Check the [Architecture](/docs/architecture) documentation
-- Review the project structure in the README
-- Explore the comprehensive testing suite
-- Join our community for support
+## 🎉 You're Ready!
 
-Start building your next SaaS application today!
+Congratulations! You now have a fully functional SaaS application running locally. The foundation is set for building your next great product.
+
+**Need help?** Check out our comprehensive documentation or reach out to the community for support.
+
+---
+
+**Ready for the next step?** Learn about the [system architecture](/docs/architecture) to understand how everything works together.

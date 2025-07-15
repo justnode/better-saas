@@ -1,0 +1,1100 @@
+---
+title: Internationalization (i18n)
+description: Complete internationalization system with next-intl, supporting multiple languages, localized routing, and dynamic content translation
+---
+
+# Internationalization (i18n)
+
+Better SaaS provides comprehensive internationalization support using next-intl, enabling multi-language applications with localized routing, dynamic content translation, and seamless language switching.
+
+## Overview
+
+The internationalization system includes:
+- **Multi-Language Support**: English and Chinese with easy extensibility
+- **Localized Routing**: Language-specific URLs and navigation
+- **Dynamic Translation**: Runtime language switching
+- **Type-Safe Translations**: TypeScript support for translation keys
+- **Locale Detection**: Automatic language detection and fallback
+- **RTL Support**: Right-to-left language support capabilities
+- **Date/Time Formatting**: Locale-specific formatting
+- **Number Formatting**: Currency and number localization
+
+## Configuration
+
+### next-intl Setup
+
+```typescript
+// src/i18n/routing.ts
+import { defineRouting } from 'next-intl/routing'
+
+export const routing = defineRouting({
+  locales: ['en', 'zh'],
+  defaultLocale: 'en',
+  pathnames: {
+    '/': '/',
+    '/dashboard': {
+      en: '/dashboard',
+      zh: '/dashboard'
+    },
+    '/settings': {
+      en: '/settings',
+      zh: '/settings'
+    },
+    '/blog': {
+      en: '/blog',
+      zh: '/blog'
+    },
+    '/docs': {
+      en: '/docs',
+      zh: '/docs'
+    }
+  }
+})
+
+export type Pathnames = keyof typeof routing.pathnames
+export type Locale = typeof routing.locales[number]
+```
+
+### Request Configuration
+
+```typescript
+// src/i18n/request.ts
+import { getRequestConfig } from 'next-intl/server'
+import { routing } from './routing'
+
+export default getRequestConfig(async ({ locale }) => {
+  // Validate that the incoming `locale` parameter is valid
+  if (!routing.locales.includes(locale as any)) {
+    throw new Error(`Invalid locale: ${locale}`)
+  }
+
+  return {
+    messages: (await import(`./messages/${locale}.json`)).default,
+    timeZone: getTimeZone(locale),
+    now: new Date(),
+    formats: {
+      dateTime: {
+        short: {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        },
+        long: {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: 'numeric'
+        }
+      },
+      number: {
+        currency: {
+          style: 'currency',
+          currency: getCurrency(locale)
+        }
+      }
+    }
+  }
+})
+
+function getTimeZone(locale: string): string {
+  switch (locale) {
+    case 'zh':
+      return 'Asia/Shanghai'
+    case 'en':
+    default:
+      return 'America/New_York'
+  }
+}
+
+function getCurrency(locale: string): string {
+  switch (locale) {
+    case 'zh':
+      return 'CNY'
+    case 'en':
+    default:
+      return 'USD'
+  }
+}
+```
+
+### Navigation Configuration
+
+```typescript
+// src/i18n/navigation.ts
+import { createSharedPathnamesNavigation } from 'next-intl/navigation'
+import { routing } from './routing'
+
+export const { Link, redirect, usePathname, useRouter } = 
+  createSharedPathnamesNavigation(routing)
+```
+
+## Translation Files
+
+### English Translations
+
+```json
+// src/i18n/messages/en.json
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "update": "Update",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "next": "Next",
+    "previous": "Previous",
+    "close": "Close"
+  },
+  "navigation": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "profile": "Profile",
+    "billing": "Billing",
+    "files": "Files",
+    "users": "Users",
+    "analytics": "Analytics",
+    "help": "Help",
+    "logout": "Logout"
+  },
+  "auth": {
+    "login": "Login",
+    "signup": "Sign Up",
+    "logout": "Logout",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "forgotPassword": "Forgot Password?",
+    "resetPassword": "Reset Password",
+    "loginWith": "Login with {provider}",
+    "signupWith": "Sign up with {provider}",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?",
+    "loginSuccess": "Login successful",
+    "signupSuccess": "Account created successfully",
+    "loginError": "Invalid email or password",
+    "signupError": "Failed to create account",
+    "passwordMismatch": "Passwords do not match",
+    "emailRequired": "Email is required",
+    "passwordRequired": "Password is required"
+  },
+  "dashboard": {
+    "welcome": "Welcome back, {name}!",
+    "overview": "Overview",
+    "recentActivity": "Recent Activity",
+    "quickActions": "Quick Actions",
+    "statistics": "Statistics",
+    "totalUsers": "Total Users",
+    "totalFiles": "Total Files",
+    "storageUsed": "Storage Used",
+    "revenue": "Revenue"
+  },
+  "files": {
+    "fileManager": "File Manager",
+    "uploadFiles": "Upload Files",
+    "createFolder": "Create Folder",
+    "selectFiles": "Select Files",
+    "dragAndDrop": "Drag and drop files here",
+    "orClickToSelect": "or click to select files",
+    "selectedFiles": "Selected Files",
+    "uploadProgress": "Upload Progress",
+    "uploadComplete": "Upload Complete",
+    "uploadFailed": "Upload Failed",
+    "deleteFile": "Delete File",
+    "shareFile": "Share File",
+    "downloadFile": "Download File",
+    "fileName": "File Name",
+    "fileSize": "File Size",
+    "fileType": "File Type",
+    "createdAt": "Created At",
+    "modifiedAt": "Modified At",
+    "noFiles": "No files found",
+    "searchFiles": "Search files...",
+    "folderName": "Folder Name",
+    "createFolderPrompt": "Enter folder name",
+    "folderCreated": "Folder created successfully",
+    "folderCreateError": "Failed to create folder",
+    "fileDeleted": "File deleted successfully",
+    "fileDeleteError": "Failed to delete file",
+    "fileSizeLimit": "File size exceeds {limit}MB limit",
+    "fileTypeNotAllowed": "File type {type} is not allowed"
+  },
+  "billing": {
+    "billingAndSubscription": "Billing & Subscription",
+    "currentPlan": "Current Plan",
+    "changePlan": "Change Plan",
+    "cancelSubscription": "Cancel Subscription",
+    "upgradeNow": "Upgrade Now",
+    "billingHistory": "Billing History",
+    "paymentMethods": "Payment Methods",
+    "addPaymentMethod": "Add Payment Method",
+    "invoice": "Invoice",
+    "amount": "Amount",
+    "date": "Date",
+    "status": "Status",
+    "paid": "Paid",
+    "pending": "Pending",
+    "failed": "Failed",
+    "nextBillingDate": "Next Billing Date",
+    "currentPeriod": "Current Period",
+    "subscriptionActive": "Subscription Active",
+    "subscriptionCanceled": "Subscription Canceled",
+    "subscriptionExpired": "Subscription Expired"
+  },
+  "settings": {
+    "settings": "Settings",
+    "profile": "Profile",
+    "security": "Security",
+    "notifications": "Notifications",
+    "language": "Language",
+    "theme": "Theme",
+    "privacy": "Privacy",
+    "account": "Account",
+    "personalInfo": "Personal Information",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "displayName": "Display Name",
+    "bio": "Bio",
+    "location": "Location",
+    "website": "Website",
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmNewPassword": "Confirm New Password",
+    "twoFactorAuth": "Two-Factor Authentication",
+    "enableTwoFactor": "Enable Two-Factor Authentication",
+    "disableTwoFactor": "Disable Two-Factor Authentication",
+    "emailNotifications": "Email Notifications",
+    "pushNotifications": "Push Notifications",
+    "marketingEmails": "Marketing Emails",
+    "securityAlerts": "Security Alerts",
+    "languageSelection": "Language Selection",
+    "themeSelection": "Theme Selection",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "profileUpdated": "Profile updated successfully",
+    "passwordChanged": "Password changed successfully",
+    "settingsSaved": "Settings saved successfully"
+  },
+  "plans": {
+    "choosePlan": "Choose Your Plan",
+    "basic": "Basic",
+    "pro": "Pro",
+    "enterprise": "Enterprise",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "perMonth": "per month",
+    "perYear": "per year",
+    "mostPopular": "Most Popular",
+    "currentPlan": "Current Plan",
+    "upgradeTo": "Upgrade to {plan}",
+    "subscribeTo": "Subscribe to {plan}",
+    "features": "Features",
+    "unlimitedProjects": "Unlimited Projects",
+    "prioritySupport": "Priority Support",
+    "advancedAnalytics": "Advanced Analytics",
+    "teamCollaboration": "Team Collaboration",
+    "customIntegrations": "Custom Integrations",
+    "slaGuarantee": "SLA Guarantee"
+  },
+  "errors": {
+    "somethingWentWrong": "Something went wrong",
+    "pageNotFound": "Page not found",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Forbidden",
+    "internalServerError": "Internal server error",
+    "networkError": "Network error",
+    "validationError": "Validation error",
+    "tryAgain": "Try again",
+    "goHome": "Go to home",
+    "contactSupport": "Contact support"
+  },
+  "time": {
+    "now": "now",
+    "minutesAgo": "{count} minutes ago",
+    "hoursAgo": "{count} hours ago",
+    "daysAgo": "{count} days ago",
+    "weeksAgo": "{count} weeks ago",
+    "monthsAgo": "{count} months ago",
+    "yearsAgo": "{count} years ago"
+  }
+}
+```
+
+### Chinese Translations
+
+```json
+// src/i18n/messages/zh.json
+{
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功",
+    "cancel": "取消",
+    "confirm": "确认",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑",
+    "create": "创建",
+    "update": "更新",
+    "search": "搜索",
+    "filter": "筛选",
+    "sort": "排序",
+    "next": "下一页",
+    "previous": "上一页",
+    "close": "关闭"
+  },
+  "navigation": {
+    "home": "首页",
+    "dashboard": "仪表板",
+    "settings": "设置",
+    "profile": "个人资料",
+    "billing": "账单",
+    "files": "文件",
+    "users": "用户",
+    "analytics": "分析",
+    "help": "帮助",
+    "logout": "登出"
+  },
+  "auth": {
+    "login": "登录",
+    "signup": "注册",
+    "logout": "登出",
+    "email": "邮箱",
+    "password": "密码",
+    "confirmPassword": "确认密码",
+    "forgotPassword": "忘记密码？",
+    "resetPassword": "重置密码",
+    "loginWith": "使用 {provider} 登录",
+    "signupWith": "使用 {provider} 注册",
+    "alreadyHaveAccount": "已有账户？",
+    "dontHaveAccount": "没有账户？",
+    "loginSuccess": "登录成功",
+    "signupSuccess": "账户创建成功",
+    "loginError": "邮箱或密码无效",
+    "signupError": "创建账户失败",
+    "passwordMismatch": "密码不匹配",
+    "emailRequired": "邮箱是必填项",
+    "passwordRequired": "密码是必填项"
+  },
+  "dashboard": {
+    "welcome": "欢迎回来，{name}！",
+    "overview": "概览",
+    "recentActivity": "最近活动",
+    "quickActions": "快速操作",
+    "statistics": "统计数据",
+    "totalUsers": "总用户数",
+    "totalFiles": "总文件数",
+    "storageUsed": "已用存储",
+    "revenue": "收入"
+  },
+  "files": {
+    "fileManager": "文件管理器",
+    "uploadFiles": "上传文件",
+    "createFolder": "创建文件夹",
+    "selectFiles": "选择文件",
+    "dragAndDrop": "拖放文件到此处",
+    "orClickToSelect": "或点击选择文件",
+    "selectedFiles": "已选择文件",
+    "uploadProgress": "上传进度",
+    "uploadComplete": "上传完成",
+    "uploadFailed": "上传失败",
+    "deleteFile": "删除文件",
+    "shareFile": "分享文件",
+    "downloadFile": "下载文件",
+    "fileName": "文件名",
+    "fileSize": "文件大小",
+    "fileType": "文件类型",
+    "createdAt": "创建时间",
+    "modifiedAt": "修改时间",
+    "noFiles": "未找到文件",
+    "searchFiles": "搜索文件...",
+    "folderName": "文件夹名称",
+    "createFolderPrompt": "输入文件夹名称",
+    "folderCreated": "文件夹创建成功",
+    "folderCreateError": "创建文件夹失败",
+    "fileDeleted": "文件删除成功",
+    "fileDeleteError": "删除文件失败",
+    "fileSizeLimit": "文件大小超过 {limit}MB 限制",
+    "fileTypeNotAllowed": "不允许 {type} 文件类型"
+  },
+  "billing": {
+    "billingAndSubscription": "账单和订阅",
+    "currentPlan": "当前计划",
+    "changePlan": "更改计划",
+    "cancelSubscription": "取消订阅",
+    "upgradeNow": "立即升级",
+    "billingHistory": "账单历史",
+    "paymentMethods": "支付方式",
+    "addPaymentMethod": "添加支付方式",
+    "invoice": "发票",
+    "amount": "金额",
+    "date": "日期",
+    "status": "状态",
+    "paid": "已支付",
+    "pending": "待处理",
+    "failed": "失败",
+    "nextBillingDate": "下次账单日期",
+    "currentPeriod": "当前周期",
+    "subscriptionActive": "订阅激活",
+    "subscriptionCanceled": "订阅已取消",
+    "subscriptionExpired": "订阅已过期"
+  },
+  "settings": {
+    "settings": "设置",
+    "profile": "个人资料",
+    "security": "安全",
+    "notifications": "通知",
+    "language": "语言",
+    "theme": "主题",
+    "privacy": "隐私",
+    "account": "账户",
+    "personalInfo": "个人信息",
+    "firstName": "名",
+    "lastName": "姓",
+    "displayName": "显示名称",
+    "bio": "简介",
+    "location": "位置",
+    "website": "网站",
+    "changePassword": "更改密码",
+    "currentPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmNewPassword": "确认新密码",
+    "twoFactorAuth": "双重认证",
+    "enableTwoFactor": "启用双重认证",
+    "disableTwoFactor": "禁用双重认证",
+    "emailNotifications": "邮件通知",
+    "pushNotifications": "推送通知",
+    "marketingEmails": "营销邮件",
+    "securityAlerts": "安全警报",
+    "languageSelection": "语言选择",
+    "themeSelection": "主题选择",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "系统",
+    "profileUpdated": "个人资料更新成功",
+    "passwordChanged": "密码更改成功",
+    "settingsSaved": "设置保存成功"
+  },
+  "plans": {
+    "choosePlan": "选择您的计划",
+    "basic": "基础版",
+    "pro": "专业版",
+    "enterprise": "企业版",
+    "monthly": "月付",
+    "yearly": "年付",
+    "perMonth": "每月",
+    "perYear": "每年",
+    "mostPopular": "最受欢迎",
+    "currentPlan": "当前计划",
+    "upgradeTo": "升级到 {plan}",
+    "subscribeTo": "订阅 {plan}",
+    "features": "功能",
+    "unlimitedProjects": "无限项目",
+    "prioritySupport": "优先支持",
+    "advancedAnalytics": "高级分析",
+    "teamCollaboration": "团队协作",
+    "customIntegrations": "自定义集成",
+    "slaGuarantee": "SLA 保证"
+  },
+  "errors": {
+    "somethingWentWrong": "出了点问题",
+    "pageNotFound": "页面未找到",
+    "unauthorized": "未授权",
+    "forbidden": "禁止访问",
+    "internalServerError": "内部服务器错误",
+    "networkError": "网络错误",
+    "validationError": "验证错误",
+    "tryAgain": "重试",
+    "goHome": "回到首页",
+    "contactSupport": "联系支持"
+  },
+  "time": {
+    "now": "刚刚",
+    "minutesAgo": "{count} 分钟前",
+    "hoursAgo": "{count} 小时前",
+    "daysAgo": "{count} 天前",
+    "weeksAgo": "{count} 周前",
+    "monthsAgo": "{count} 个月前",
+    "yearsAgo": "{count} 年前"
+  }
+}
+```
+
+## Language Switcher Component
+
+### Language Switcher
+
+```tsx
+// src/components/widget/language-switcher.tsx
+"use client"
+
+import { useState, useTransition } from 'react'
+import { useLocale } from 'next-intl'
+import { useRouter, usePathname } from '@/i18n/navigation'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Globe, Check } from 'lucide-react'
+
+const languages = [
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'zh', name: '中文', flag: '🇨🇳' },
+] as const
+
+export function LanguageSwitcher() {
+  const locale = useLocale()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [isPending, startTransition] = useTransition()
+
+  const handleLanguageChange = (newLocale: string) => {
+    startTransition(() => {
+      router.replace(pathname, { locale: newLocale })
+    })
+  }
+
+  const currentLanguage = languages.find(lang => lang.code === locale)
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+          <Globe className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {languages.map((language) => (
+          <DropdownMenuItem
+            key={language.code}
+            onClick={() => handleLanguageChange(language.code)}
+            className="flex items-center gap-2"
+          >
+            <span className="text-lg">{language.flag}</span>
+            <span>{language.name}</span>
+            {language.code === locale && (
+              <Check className="h-4 w-4 ml-auto" />
+            )}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+```
+
+## Using Translations in Components
+
+### Basic Usage
+
+```tsx
+// src/components/dashboard/dashboard-content.tsx
+import { useTranslations } from 'next-intl'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+export function DashboardContent({ user }: { user: any }) {
+  const t = useTranslations('dashboard')
+  const tCommon = useTranslations('common')
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">
+        {t('welcome', { name: user.name })}
+      </h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('totalUsers')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">1,234</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('totalFiles')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">5,678</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('storageUsed')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">2.5 GB</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('revenue')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">$12,345</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+```
+
+### Rich Text and Formatting
+
+```tsx
+// src/components/billing/billing-info.tsx
+import { useTranslations, useFormatter } from 'next-intl'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+export function BillingInfo({ subscription }: { subscription: any }) {
+  const t = useTranslations('billing')
+  const format = useFormatter()
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('currentPlan')}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <p className="font-medium">{subscription.planName}</p>
+          <p className="text-sm text-muted-foreground">
+            {format.number(subscription.price, 'currency')} {t('perMonth')}
+          </p>
+        </div>
+        
+        <div>
+          <p className="text-sm font-medium">{t('nextBillingDate')}</p>
+          <p className="text-sm text-muted-foreground">
+            {format.dateTime(subscription.nextBillingDate, 'short')}
+          </p>
+        </div>
+        
+        <div>
+          <p className="text-sm font-medium">{t('currentPeriod')}</p>
+          <p className="text-sm text-muted-foreground">
+            {format.dateTime(subscription.currentPeriodStart, 'short')} - {' '}
+            {format.dateTime(subscription.currentPeriodEnd, 'short')}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+## Server-Side Translations
+
+### Server Components
+
+```tsx
+// src/app/[locale]/dashboard/page.tsx
+import { getTranslations } from 'next-intl/server'
+import { DashboardContent } from '@/components/dashboard/dashboard-content'
+
+export default async function DashboardPage() {
+  const t = await getTranslations('dashboard')
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">{t('overview')}</h1>
+        <p className="text-muted-foreground">
+          {t('recentActivity')}
+        </p>
+      </div>
+      
+      <DashboardContent />
+    </div>
+  )
+}
+
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {
+  const t = await getTranslations({ locale, namespace: 'dashboard' })
+
+  return {
+    title: t('overview'),
+    description: t('recentActivity'),
+  }
+}
+```
+
+### API Routes with Translations
+
+```typescript
+// src/app/api/files/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { getTranslations } from 'next-intl/server'
+
+export async function POST(request: NextRequest) {
+  const locale = request.headers.get('accept-language')?.split(',')[0] || 'en'
+  const t = await getTranslations({ locale, namespace: 'files' })
+
+  try {
+    // File upload logic here
+    return NextResponse.json({
+      message: t('uploadComplete'),
+      success: true
+    })
+  } catch (error) {
+    return NextResponse.json({
+      message: t('uploadFailed'),
+      success: false
+    }, { status: 500 })
+  }
+}
+```
+
+## Type-Safe Translations
+
+### Translation Types
+
+```typescript
+// src/types/translations.ts
+import type { AbstractIntlMessages } from 'next-intl'
+
+export type Messages = AbstractIntlMessages & {
+  common: {
+    loading: string
+    error: string
+    success: string
+    cancel: string
+    confirm: string
+    save: string
+    delete: string
+    edit: string
+    create: string
+    update: string
+  }
+  navigation: {
+    home: string
+    dashboard: string
+    settings: string
+    profile: string
+    billing: string
+    files: string
+    users: string
+    analytics: string
+    help: string
+    logout: string
+  }
+  auth: {
+    login: string
+    signup: string
+    logout: string
+    email: string
+    password: string
+    confirmPassword: string
+    forgotPassword: string
+    resetPassword: string
+    loginWith: string
+    signupWith: string
+    alreadyHaveAccount: string
+    dontHaveAccount: string
+    loginSuccess: string
+    signupSuccess: string
+    loginError: string
+    signupError: string
+    passwordMismatch: string
+    emailRequired: string
+    passwordRequired: string
+  }
+  // Add more namespace types as needed
+}
+```
+
+### Custom Hook for Type-Safe Translations
+
+```typescript
+// src/hooks/use-translations.ts
+import { useTranslations } from 'next-intl'
+import type { Messages } from '@/types/translations'
+
+export function useTypedTranslations<T extends keyof Messages>(namespace: T) {
+  return useTranslations(namespace)
+}
+```
+
+## Date and Time Formatting
+
+### Date Formatting Utils
+
+```typescript
+// src/lib/date-utils.ts
+import { useFormatter } from 'next-intl'
+
+export function useDateFormatter() {
+  const format = useFormatter()
+
+  return {
+    formatDate: (date: Date) => format.dateTime(date, 'short'),
+    formatDateTime: (date: Date) => format.dateTime(date, 'long'),
+    formatRelativeTime: (date: Date) => format.relativeTime(date),
+    formatNumber: (number: number) => format.number(number),
+    formatCurrency: (amount: number) => format.number(amount, 'currency'),
+  }
+}
+```
+
+### Time Formatting Component
+
+```tsx
+// src/components/ui/formatted-time.tsx
+import { useFormatter } from 'next-intl'
+
+interface FormattedTimeProps {
+  date: Date
+  format?: 'short' | 'long' | 'relative'
+}
+
+export function FormattedTime({ date, format = 'short' }: FormattedTimeProps) {
+  const formatter = useFormatter()
+
+  const formatDate = () => {
+    switch (format) {
+      case 'long':
+        return formatter.dateTime(date, 'long')
+      case 'relative':
+        return formatter.relativeTime(date)
+      default:
+        return formatter.dateTime(date, 'short')
+    }
+  }
+
+  return <time dateTime={date.toISOString()}>{formatDate()}</time>
+}
+```
+
+## Middleware Configuration
+
+### Internationalization Middleware
+
+```typescript
+// src/middleware.ts
+import createMiddleware from 'next-intl/middleware'
+import { routing } from './i18n/routing'
+
+export default createMiddleware(routing)
+
+export const config = {
+  matcher: [
+    // Enable a redirect to a matching locale at the root
+    '/',
+    
+    // Set a cookie to remember the previous locale for
+    // all requests that have a locale prefix
+    '/(zh|en)/:path*',
+    
+    // Enable redirects that add missing locales
+    // (e.g. `/pathnames` -> `/en/pathnames`)
+    '/((?!_next|_vercel|.*\\..*).*)'
+  ]
+}
+```
+
+## Testing Internationalization
+
+### Unit Tests
+
+```typescript
+// src/components/language-switcher.test.tsx
+import { render, screen } from '@testing-library/react'
+import { NextIntlClientProvider } from 'next-intl'
+import { LanguageSwitcher } from '@/components/widget/language-switcher'
+
+const messages = {
+  common: {
+    loading: 'Loading...',
+    error: 'Error'
+  }
+}
+
+describe('LanguageSwitcher', () => {
+  it('renders language options', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <LanguageSwitcher />
+      </NextIntlClientProvider>
+    )
+
+    expect(screen.getByRole('button')).toBeInTheDocument()
+  })
+
+  it('shows current locale', () => {
+    render(
+      <NextIntlClientProvider locale="zh" messages={messages}>
+        <LanguageSwitcher />
+      </NextIntlClientProvider>
+    )
+
+    // Test current locale display
+  })
+})
+```
+
+### E2E Tests
+
+```typescript
+// tests/e2e/i18n.spec.ts
+import { test, expect } from '@playwright/test'
+
+test.describe('Internationalization', () => {
+  test('should switch languages', async ({ page }) => {
+    await page.goto('/')
+    
+    // Check default language
+    await expect(page.locator('h1')).toContainText('Welcome')
+    
+    // Switch to Chinese
+    await page.click('[data-testid="language-switcher"]')
+    await page.click('[data-testid="language-zh"]')
+    
+    // Verify language changed
+    await expect(page.locator('h1')).toContainText('欢迎')
+    await expect(page.url()).toContain('/zh')
+  })
+
+  test('should persist language preference', async ({ page }) => {
+    await page.goto('/zh')
+    await page.reload()
+    
+    // Should stay in Chinese
+    await expect(page.url()).toContain('/zh')
+  })
+})
+```
+
+## Best Practices
+
+### Translation Key Organization
+
+```typescript
+// Good: Organized by feature/page
+"dashboard.welcome": "Welcome back, {name}!"
+"dashboard.totalUsers": "Total Users"
+"files.uploadComplete": "Upload Complete"
+
+// Bad: Flat structure
+"welcomeMessage": "Welcome back, {name}!"
+"totalUsers": "Total Users"
+"uploadComplete": "Upload Complete"
+```
+
+### Pluralization
+
+```json
+{
+  "files": {
+    "fileCount": {
+      "zero": "No files",
+      "one": "1 file",
+      "other": "{count} files"
+    }
+  }
+}
+```
+
+### Rich Text with Components
+
+```tsx
+const t = useTranslations('auth')
+
+// Translation with link
+<p>
+  {t.rich('alreadyHaveAccount', {
+    link: (chunks) => <Link href="/login">{chunks}</Link>
+  })}
+</p>
+```
+
+## Performance Optimization
+
+### Lazy Loading Translations
+
+```typescript
+// src/lib/lazy-translations.ts
+import { lazy } from 'react'
+
+export const LazyTranslations = {
+  dashboard: lazy(() => import('@/i18n/messages/dashboard')),
+  billing: lazy(() => import('@/i18n/messages/billing')),
+  files: lazy(() => import('@/i18n/messages/files')),
+}
+```
+
+### Translation Caching
+
+```typescript
+// src/lib/translation-cache.ts
+const translationCache = new Map<string, any>()
+
+export function getCachedTranslations(locale: string, namespace: string) {
+  const key = `${locale}-${namespace}`
+  
+  if (translationCache.has(key)) {
+    return translationCache.get(key)
+  }
+  
+  const translations = require(`@/i18n/messages/${locale}/${namespace}.json`)
+  translationCache.set(key, translations)
+  
+  return translations
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Missing Translation Keys**
+   - Check translation files for missing keys
+   - Verify namespace imports
+   - Use fallback values
+
+2. **Locale Not Switching**
+   - Check middleware configuration
+   - Verify routing setup
+   - Clear browser cache
+
+3. **Server/Client Mismatch**
+   - Ensure consistent locale detection
+   - Check hydration errors
+   - Verify SSR configuration
+
+### Debug Tools
+
+```typescript
+// src/lib/i18n-debug.ts
+export function debugTranslations() {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Available locales:', routing.locales)
+    console.log('Current locale:', useLocale())
+  }
+}
+```
+
+## Next Steps
+
+- Configure [Admin Dashboard](./admin-dashboard) with multi-language support
+- Implement [User Management](./user-management) with localized interfaces
+- Set up [Authentication](./authentication) with localized messages
+- Review [File Management](./file-management) with translated UI 

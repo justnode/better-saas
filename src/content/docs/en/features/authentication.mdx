@@ -1,0 +1,892 @@
+---
+title: Authentication
+description: Comprehensive authentication system with multi-provider OAuth, role-based access control, and session management
+---
+
+# Authentication
+
+Better SaaS features a robust authentication system built with Better Auth, supporting multiple OAuth providers, role-based access control, and secure session management.
+
+## Overview
+
+The authentication system provides:
+- **Multi-Provider OAuth**: GitHub, Google, and custom providers
+- **Role-Based Access Control**: Admin, user, and custom roles
+- **Session Management**: Secure session handling with Redis
+- **Password Security**: Bcrypt hashing and security best practices
+- **Account Linking**: Link multiple OAuth accounts to one user
+- **Email Verification**: Optional email verification workflow
+
+## Better Auth Configuration
+
+### Core Configuration
+
+The authentication is configured in `src/lib/auth/auth.ts`:
+
+```typescript
+import { betterAuth } from "better-auth"
+import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { db } from "@/server/db"
+import { 
+  users, 
+  sessions, 
+  accounts, 
+  verificationTokens 
+} from "@/server/db/schema"
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
+      users,
+      sessions,
+      accounts,
+      verificationTokens,
+    },
+  }),
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false,
+  },
+  socialProviders: {
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    },
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    },
+  },
+  session: {
+    expiresIn: 60 * 60 * 24 * 7, // 7 days
+    updateAge: 60 * 60 * 24, // 24 hours
+  },
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        defaultValue: "user",
+      },
+      isActive: {
+        type: "boolean",
+        defaultValue: true,
+      },
+    },
+  },
+  plugins: [
+    // Add custom plugins here
+  ],
+})
+
+export type Session = typeof auth.$Infer.Session
+export type User = typeof auth.$Infer.User
+```
+
+### Client-Side Configuration
+
+Client configuration in `src/lib/auth/auth-client.ts`:
+
+```typescript
+import { createAuthClient } from "better-auth/react"
+import { inferAdditionalFields } from "better-auth/client/plugins"
+
+export const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_AUTH_URL || "http://localhost:3000",
+  plugins: [
+    inferAdditionalFields<{
+      role: string
+      isActive: boolean
+    }>(),
+  ],
+})
+
+export const {
+  signIn,
+  signOut,
+  signUp,
+  useSession,
+  getSession,
+} = authClient
+```
+
+## Database Schema
+
+### User Schema
+
+```typescript
+// src/server/db/schema.ts
+export const users = pgTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  email: text("email").unique().notNull(),
+  emailVerified: timestamp("emailVerified", { mode: "date" }),
+  image: text("image"),
+  role: text("role").default("user").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const sessions = pgTable("sessions", {
+  id: text("id").primaryKey(),
+  sessionToken: text("sessionToken").unique().notNull(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const accounts = pgTable("accounts", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  provider: text("provider").notNull(),
+  providerAccountId: text("providerAccountId").notNull(),
+  refresh_token: text("refresh_token"),
+  access_token: text("access_token"),
+  expires_at: integer("expires_at"),
+  token_type: text("token_type"),
+  scope: text("scope"),
+  id_token: text("id_token"),
+  session_state: text("session_state"),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+})
+```
+
+## OAuth Providers
+
+### GitHub OAuth Setup
+
+1. **Create GitHub OAuth App**:
+   - Go to GitHub Settings > Developer settings > OAuth Apps
+   - Create new OAuth App
+   - Set Authorization callback URL: `https://yourdomain.com/api/auth/callback/github`
+
+2. **Environment Variables**:
+   ```
+   GITHUB_CLIENT_ID=your_github_client_id
+   GITHUB_CLIENT_SECRET=your_github_client_secret
+   ```
+
+3. **Usage in Components**:
+   ```tsx
+   import { signIn } from "@/lib/auth/auth-client"
+
+   export function GitHubSignIn() {
+     const handleSignIn = async () => {
+       await signIn.social({
+         provider: "github",
+         callbackURL: "/dashboard",
+       })
+     }
+
+     return (
+       <button onClick={handleSignIn}>
+         Sign in with GitHub
+       </button>
+     )
+   }
+   ```
+
+### Google OAuth Setup
+
+1. **Create Google OAuth Credentials**:
+   - Go to Google Cloud Console
+   - Create OAuth 2.0 Client ID
+   - Add authorized redirect URI: `https://yourdomain.com/api/auth/callback/google`
+
+2. **Environment Variables**:
+   ```
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   ```
+
+3. **Usage in Components**:
+   ```tsx
+   import { signIn } from "@/lib/auth/auth-client"
+
+   export function GoogleSignIn() {
+     const handleSignIn = async () => {
+       await signIn.social({
+         provider: "google",
+         callbackURL: "/dashboard",
+       })
+     }
+
+     return (
+       <button onClick={handleSignIn}>
+         Sign in with Google
+       </button>
+     )
+   }
+   ```
+
+## Role-Based Access Control
+
+### Permission System
+
+Define permissions in `src/lib/auth/permissions.ts`:
+
+```typescript
+export const ROLES = {
+  ADMIN: "admin",
+  USER: "user",
+  MODERATOR: "moderator",
+} as const
+
+export type Role = typeof ROLES[keyof typeof ROLES]
+
+export const PERMISSIONS = {
+  // User permissions
+  READ_PROFILE: "read:profile",
+  UPDATE_PROFILE: "update:profile",
+  
+  // Admin permissions
+  MANAGE_USERS: "manage:users",
+  MANAGE_SETTINGS: "manage:settings",
+  VIEW_ANALYTICS: "view:analytics",
+  
+  // File permissions
+  UPLOAD_FILES: "upload:files",
+  DELETE_FILES: "delete:files",
+  
+  // Payment permissions
+  MANAGE_SUBSCRIPTIONS: "manage:subscriptions",
+  VIEW_BILLING: "view:billing",
+} as const
+
+export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS]
+
+export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+  [ROLES.USER]: [
+    PERMISSIONS.READ_PROFILE,
+    PERMISSIONS.UPDATE_PROFILE,
+    PERMISSIONS.UPLOAD_FILES,
+    PERMISSIONS.VIEW_BILLING,
+  ],
+  [ROLES.MODERATOR]: [
+    PERMISSIONS.READ_PROFILE,
+    PERMISSIONS.UPDATE_PROFILE,
+    PERMISSIONS.UPLOAD_FILES,
+    PERMISSIONS.DELETE_FILES,
+    PERMISSIONS.VIEW_BILLING,
+  ],
+  [ROLES.ADMIN]: [
+    PERMISSIONS.READ_PROFILE,
+    PERMISSIONS.UPDATE_PROFILE,
+    PERMISSIONS.UPLOAD_FILES,
+    PERMISSIONS.DELETE_FILES,
+    PERMISSIONS.MANAGE_USERS,
+    PERMISSIONS.MANAGE_SETTINGS,
+    PERMISSIONS.VIEW_ANALYTICS,
+    PERMISSIONS.MANAGE_SUBSCRIPTIONS,
+    PERMISSIONS.VIEW_BILLING,
+  ],
+}
+
+export function hasPermission(role: Role, permission: Permission): boolean {
+  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
+}
+
+export function hasAnyPermission(role: Role, permissions: Permission[]): boolean {
+  return permissions.some(permission => hasPermission(role, permission))
+}
+```
+
+### Permission Hooks
+
+Create permission hooks in `src/hooks/use-permissions.ts`:
+
+```typescript
+import { useSession } from "@/lib/auth/auth-client"
+import { hasPermission, hasAnyPermission, type Permission, type Role } from "@/lib/auth/permissions"
+
+export function usePermissions() {
+  const { data: session } = useSession()
+  const userRole = session?.user?.role as Role
+
+  const checkPermission = (permission: Permission): boolean => {
+    if (!userRole) return false
+    return hasPermission(userRole, permission)
+  }
+
+  const checkAnyPermission = (permissions: Permission[]): boolean => {
+    if (!userRole) return false
+    return hasAnyPermission(userRole, permissions)
+  }
+
+  return {
+    hasPermission: checkPermission,
+    hasAnyPermission: checkAnyPermission,
+    role: userRole,
+    isAdmin: userRole === "admin",
+    isUser: userRole === "user",
+    isModerator: userRole === "moderator",
+  }
+}
+```
+
+## Authentication Components
+
+### Login Form
+
+```tsx
+// src/components/blocks/login/login-form.tsx
+"use client"
+
+import { useState } from "react"
+import { signIn } from "@/lib/auth/auth-client"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
+export function LoginForm() {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
+
+    try {
+      await signIn.email({
+        email,
+        password,
+        callbackURL: "/dashboard",
+      })
+    } catch (err) {
+      setError("Invalid email or password")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSocialSignIn = async (provider: "github" | "google") => {
+    setIsLoading(true)
+    try {
+      await signIn.social({
+        provider,
+        callbackURL: "/dashboard",
+      })
+    } catch (err) {
+      setError(`Failed to sign in with ${provider}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>Sign In</CardTitle>
+        <CardDescription>
+          Enter your credentials to access your account
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <form onSubmit={handleEmailSignIn} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "Signing in..." : "Sign In"}
+          </Button>
+        </form>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              Or continue with
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Button
+            variant="outline"
+            onClick={() => handleSocialSignIn("github")}
+            disabled={isLoading}
+          >
+            GitHub
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handleSocialSignIn("google")}
+            disabled={isLoading}
+          >
+            Google
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### Sign Up Form
+
+```tsx
+// src/components/blocks/signup/signup-form.tsx
+"use client"
+
+import { useState } from "react"
+import { signUp } from "@/lib/auth/auth-client"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
+export function SignUpForm() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  })
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match")
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      await signUp.email({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        callbackURL: "/dashboard",
+      })
+    } catch (err) {
+      setError("Failed to create account")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>Create Account</CardTitle>
+        <CardDescription>
+          Enter your information to create a new account
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Full Name</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Input
+              id="confirmPassword"
+              type="password"
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              required
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "Creating Account..." : "Create Account"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+## Route Protection
+
+### Auth Guard Component
+
+```tsx
+// src/components/auth-guard.tsx
+"use client"
+
+import { useSession } from "@/lib/auth/auth-client"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { LoadingSkeleton } from "@/components/loading-skeleton"
+
+interface AuthGuardProps {
+  children: React.ReactNode
+  requireAuth?: boolean
+  requiredRole?: string
+  fallbackUrl?: string
+}
+
+export function AuthGuard({ 
+  children, 
+  requireAuth = true, 
+  requiredRole,
+  fallbackUrl = "/login" 
+}: AuthGuardProps) {
+  const { data: session, isPending } = useSession()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (isPending) return
+
+    if (requireAuth && !session) {
+      router.push(fallbackUrl)
+      return
+    }
+
+    if (requiredRole && session?.user?.role !== requiredRole) {
+      router.push("/unauthorized")
+      return
+    }
+  }, [session, isPending, requireAuth, requiredRole, router, fallbackUrl])
+
+  if (isPending) {
+    return <LoadingSkeleton />
+  }
+
+  if (requireAuth && !session) {
+    return null
+  }
+
+  if (requiredRole && session?.user?.role !== requiredRole) {
+    return null
+  }
+
+  return <>{children}</>
+}
+```
+
+### Admin Guard Component
+
+```tsx
+// src/components/admin-guard.tsx
+"use client"
+
+import { usePermissions } from "@/hooks/use-permissions"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { LoadingSkeleton } from "@/components/loading-skeleton"
+
+interface AdminGuardProps {
+  children: React.ReactNode
+  fallbackUrl?: string
+}
+
+export function AdminGuard({ children, fallbackUrl = "/dashboard" }: AdminGuardProps) {
+  const { isAdmin, role } = usePermissions()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (role && !isAdmin) {
+      router.push(fallbackUrl)
+    }
+  }, [isAdmin, role, router, fallbackUrl])
+
+  if (!role) {
+    return <LoadingSkeleton />
+  }
+
+  if (!isAdmin) {
+    return null
+  }
+
+  return <>{children}</>
+}
+```
+
+## Session Management
+
+### Session Provider
+
+```tsx
+// src/components/providers/auth-provider.tsx
+"use client"
+
+import { SessionProvider } from "@/lib/auth/auth-client"
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  return <SessionProvider>{children}</SessionProvider>
+}
+```
+
+### Session Hook Usage
+
+```tsx
+// Example component using session
+"use client"
+
+import { useSession } from "@/lib/auth/auth-client"
+import { signOut } from "@/lib/auth/auth-client"
+
+export function UserProfile() {
+  const { data: session, isPending } = useSession()
+
+  if (isPending) return <div>Loading...</div>
+  if (!session) return <div>Not authenticated</div>
+
+  return (
+    <div>
+      <h1>Welcome, {session.user.name}!</h1>
+      <p>Email: {session.user.email}</p>
+      <p>Role: {session.user.role}</p>
+      <button onClick={() => signOut()}>
+        Sign Out
+      </button>
+    </div>
+  )
+}
+```
+
+## Server Actions
+
+### Authentication Actions
+
+```typescript
+// src/server/actions/auth-actions.ts
+"use server"
+
+import { auth } from "@/lib/auth/auth"
+import { db } from "@/server/db"
+import { users } from "@/server/db/schema"
+import { eq } from "drizzle-orm"
+import { revalidatePath } from "next/cache"
+
+export async function updateUserRole(userId: string, newRole: string) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session || session.user.role !== "admin") {
+    throw new Error("Unauthorized")
+  }
+
+  await db
+    .update(users)
+    .set({ role: newRole })
+    .where(eq(users.id, userId))
+
+  revalidatePath("/admin/users")
+}
+
+export async function deactivateUser(userId: string) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session || session.user.role !== "admin") {
+    throw new Error("Unauthorized")
+  }
+
+  await db
+    .update(users)
+    .set({ isActive: false })
+    .where(eq(users.id, userId))
+
+  revalidatePath("/admin/users")
+}
+```
+
+## Security Best Practices
+
+### Environment Variables
+
+```
+# Required for Better Auth
+BETTER_AUTH_SECRET=your-super-secret-key-here
+BETTER_AUTH_URL=https://yourdomain.com
+
+# OAuth Providers
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/bettersaas
+```
+
+### Security Headers
+
+```typescript
+// next.config.ts
+const securityHeaders = [
+  {
+    key: 'X-Frame-Options',
+    value: 'DENY'
+  },
+  {
+    key: 'X-Content-Type-Options',
+    value: 'nosniff'
+  },
+  {
+    key: 'Referrer-Policy',
+    value: 'strict-origin-when-cross-origin'
+  }
+]
+
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: securityHeaders,
+      },
+    ]
+  },
+}
+```
+
+## Testing Authentication
+
+### Unit Tests
+
+```typescript
+// src/lib/auth/permissions.test.ts
+import { describe, it, expect } from 'vitest'
+import { hasPermission, ROLES, PERMISSIONS } from './permissions'
+
+describe('Permission System', () => {
+  it('should grant admin all permissions', () => {
+    expect(hasPermission(ROLES.ADMIN, PERMISSIONS.MANAGE_USERS)).toBe(true)
+    expect(hasPermission(ROLES.ADMIN, PERMISSIONS.VIEW_ANALYTICS)).toBe(true)
+  })
+
+  it('should restrict user permissions', () => {
+    expect(hasPermission(ROLES.USER, PERMISSIONS.MANAGE_USERS)).toBe(false)
+    expect(hasPermission(ROLES.USER, PERMISSIONS.READ_PROFILE)).toBe(true)
+  })
+})
+```
+
+### Integration Tests
+
+```typescript
+// tests/integration/auth.test.ts
+import { describe, it, expect } from 'vitest'
+import { testClient } from '../utils/test-client'
+
+describe('Authentication API', () => {
+  it('should create user account', async () => {
+    const response = await testClient.post('/api/auth/signup', {
+      email: 'test@example.com',
+      password: 'password123',
+      name: 'Test User'
+    })
+
+    expect(response.status).toBe(201)
+    expect(response.data.user.email).toBe('test@example.com')
+  })
+
+  it('should sign in user', async () => {
+    const response = await testClient.post('/api/auth/signin', {
+      email: 'test@example.com',
+      password: 'password123'
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.data.user).toBeDefined()
+  })
+})
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **OAuth Callback Errors**
+   - Verify callback URLs in OAuth provider settings
+   - Check environment variables are set correctly
+   - Ensure BETTER_AUTH_URL matches your domain
+
+2. **Session Not Persisting**
+   - Check database connection
+   - Verify session table exists
+   - Check Redis connection if using Redis sessions
+
+3. **Permission Denied**
+   - Verify user role in database
+   - Check permission configuration
+   - Ensure auth middleware is properly configured
+
+### Debug Commands
+
+```bash
+# Check user sessions
+psql -d bettersaas -c "SELECT * FROM sessions WHERE userId = 'user-id';"
+
+# Check user roles
+psql -d bettersaas -c "SELECT id, email, role FROM users;"
+
+# Test OAuth endpoints
+curl -X GET http://localhost:3000/api/auth/providers
+```
+
+## Next Steps
+
+- Configure [Payment & Billing](./payment-billing) integration
+- Set up [File Management](./file-management) with proper permissions
+- Implement [Admin Dashboard](./admin-dashboard) with role-based access
+- Review [User Management](./user-management) features 

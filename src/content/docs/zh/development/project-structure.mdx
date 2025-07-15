@@ -1,0 +1,494 @@
+---
+title: 项目结构
+---
+Better SaaS 遵循基于 Next.js 15 App Router 的良好组织的项目结构，具有清晰的关注点分离和模块化架构。
+
+## 概述
+
+项目结构支持：
+- **可扩展架构**: 模块化组件和清晰分离
+- **类型安全**: 整个代码库使用 TypeScript
+- **国际化**: 使用 next-intl 的多语言支持
+- **现代工具**: 最新的 Next.js 功能和最佳实践
+- **测试**: 多级别的全面测试设置
+
+## 根目录结构
+
+```
+better-saas/
+├── .env.example                 # 环境变量模板
+├── .gitignore                   # Git 忽略规则
+├── biome.jsonc                  # 代码格式化和检查配置
+├── components.json              # Shadcn/ui 组件配置
+├── drizzle.config.ts           # 数据库 ORM 配置
+├── jest.config.js              # Jest 测试配置
+├── next.config.ts              # Next.js 配置
+├── package.json                # 依赖和脚本
+├── playwright.config.ts        # E2E 测试配置
+├── postcss.config.js           # PostCSS 配置
+├── README.md                   # 项目文档
+├── source.config.ts            # Fumadocs 配置
+├── tailwind.config.ts          # Tailwind CSS 配置
+├── tsconfig.json               # TypeScript 配置
+├── docs/                       # 文档文件
+├── drizzle/                    # 数据库迁移
+├── public/                     # 静态资源
+├── scripts/                    # 构建和工具脚本
+├── src/                        # 源代码
+└── tests/                      # 测试文件
+```
+
+## 源代码结构 (`src/`)
+
+### 应用目录 (`src/app/`)
+
+遵循 Next.js 15 App Router 约定：
+
+```
+src/app/
+├── [locale]/                   # 国际化路由
+│   ├── (home)/                # 首页组
+│   │   ├── blocks/            # 块组件展示
+│   │   ├── blog/              # 博客页面
+│   │   ├── layout.tsx         # 首页布局
+│   │   └── page.tsx           # 首页
+│   ├── (protected)/           # 受保护路由组
+│   │   ├── dashboard/         # 仪表板页面
+│   │   └── settings/          # 设置页面
+│   ├── docs/                  # 文档页面
+│   ├── login/                 # 认证页面
+│   ├── signup/
+│   ├── layout.tsx             # 特定语言布局
+│   └── page.tsx               # 语言根页面
+├── api/                       # API 路由
+│   ├── auth/                  # 认证端点
+│   └── webhooks/              # Webhook 处理器
+├── layout.tsx                 # 根布局
+└── not-found.tsx              # 404 页面
+```
+
+### 组件目录 (`src/components/`)
+
+按功能和可重用性组织：
+
+```
+src/components/
+├── ui/                        # 基础 UI 组件 (shadcn/ui)
+│   ├── button.tsx
+│   ├── card.tsx
+│   ├── input.tsx
+│   └── ...
+├── blocks/                    # 页面块和部分
+│   ├── hero/
+│   ├── features/
+│   ├── pricing/
+│   ├── navbar/
+│   └── footer/
+├── auth/                      # 认证组件
+│   ├── login-form.tsx
+│   ├── signup-form.tsx
+│   └── permission-provider.tsx
+├── dashboard/                 # 仪表板组件
+│   ├── dashboard-content.tsx
+│   ├── dashboard-header.tsx
+│   └── protected-layout-client.tsx
+├── file-manager/              # 文件管理组件
+│   ├── file-upload.tsx
+│   ├── file-grid.tsx
+│   └── file-table.tsx
+├── payment/                   # 支付组件
+│   ├── subscription-card.tsx
+│   └── checkout-form.tsx
+├── billing/                   # 账单组件
+│   └── billing-page.tsx
+├── settings/                  # 设置组件
+│   ├── profile-content.tsx
+│   └── security-content.tsx
+├── providers/                 # 上下文提供者
+│   ├── auth-provider.tsx
+│   └── theme-provider.tsx
+└── widget/                    # 可重用小部件
+    ├── language-switcher.tsx
+    ├── theme-toggle.tsx
+    └── user-avatar-menu.tsx
+```
+
+### 配置目录 (`src/config/`)
+
+集中配置管理：
+
+```
+src/config/
+├── app.config.ts              # 应用程序配置
+├── features.config.ts         # 功能标志和设置
+├── i18n.config.ts            # 国际化配置
+├── navbar.config.ts          # 导航配置
+├── payment.config.ts         # 支付计划和定价
+├── theme.config.ts           # 主题配置
+└── index.ts                  # 配置导出
+```
+
+### 库目录 (`src/lib/`)
+
+工具函数和服务：
+
+```
+src/lib/
+├── auth/                      # 认证工具
+│   ├── auth.ts               # 服务器端认证配置
+│   ├── auth-client.ts        # 客户端认证
+│   └── permissions.ts        # 权限系统
+├── fumadocs/                 # 文档系统
+│   ├── blog.ts
+│   └── docs.ts
+├── logger/                   # 日志工具
+│   ├── logger.ts
+│   └── logger-utils.ts
+├── blocks-registry.ts        # 组件注册表
+├── config-validation.ts     # 配置验证
+├── file-service.ts          # 文件管理服务
+├── r2-client.ts             # 云存储客户端
+└── utils.ts                 # 通用工具
+```
+
+### 服务器目录 (`src/server/`)
+
+服务器端代码和数据库操作：
+
+```
+src/server/
+├── actions/                   # 服务器操作
+│   ├── auth-actions.ts
+│   ├── file-actions.ts
+│   ├── user-actions.ts
+│   ├── payment/
+│   │   ├── create-subscription.ts
+│   │   ├── cancel-subscription.ts
+│   │   └── get-billing-info.ts
+│   └── error-messages.ts
+├── db/                        # 数据库层
+│   ├── index.ts              # 数据库连接
+│   ├── schema.ts             # 数据库架构
+│   ├── types.ts              # 数据库类型
+│   ├── repositories/         # 数据访问层
+│   │   ├── base-repository.ts
+│   │   ├── file-repository.ts
+│   │   └── payment-repository.ts
+│   └── services/             # 业务逻辑层
+│       └── index.ts
+└── middleware/               # 服务器中间件
+```
+
+### 国际化 (`src/i18n/`)
+
+多语言支持：
+
+```
+src/i18n/
+├── messages/                  # 翻译文件
+│   ├── en.json               # 英文翻译
+│   └── zh.json               # 中文翻译
+├── navigation.ts             # 本地化导航
+├── request.ts                # 请求配置
+└── routing.ts                # 路由配置
+```
+
+### 钩子目录 (`src/hooks/`)
+
+自定义 React 钩子：
+
+```
+src/hooks/
+├── use-config.ts             # 配置钩子
+├── use-debounce.ts           # 防抖钩子
+├── use-files.ts              # 文件管理钩子
+├── use-login.ts              # 认证钩子
+├── use-navbar.ts             # 导航钩子
+├── use-profile.ts            # 个人资料钩子
+└── use-toast-messages.ts     # 消息通知钩子
+```
+
+### 类型目录 (`src/types/`)
+
+TypeScript 类型定义：
+
+```
+src/types/
+├── index.d.ts                # 全局类型定义
+├── blocks.ts                 # 块组件类型
+├── login.ts                  # 认证类型
+├── navbar.ts                 # 导航类型
+├── profile.ts                # 个人资料类型
+└── stripe-extended.ts        # 扩展的 Stripe 类型
+```
+
+### 内容目录 (`src/content/`)
+
+静态内容和文档：
+
+```
+src/content/
+├── blog/                     # 博客文章
+│   ├── en/                   # 英文博客文章
+│   └── zh/                   # 中文博客文章
+└── docs/                     # 文档
+    ├── en/                   # 英文文档
+    └── zh/                   # 中文文档
+```
+
+## 测试结构 (`tests/`)
+
+全面的测试设置：
+
+```
+tests/
+├── __mocks__/                # 模拟文件
+├── e2e/                      # 端到端测试
+│   ├── auth/
+│   ├── dashboard/
+│   ├── payment/
+│   └── fixtures/
+├── integration/              # 集成测试
+│   ├── api/
+│   ├── database/
+│   └── services/
+├── unit/                     # 单元测试
+│   ├── components/
+│   ├── hooks/
+│   ├── lib/
+│   └── server/
+├── setup/                    # 测试设置文件
+└── utils/                    # 测试工具
+```
+
+## 文件命名约定
+
+### 组件
+- **React 组件**: PascalCase (例如: `UserProfile.tsx`)
+- **组件文件**: kebab-case (例如: `user-profile.tsx`)
+- **钩子文件**: kebab-case 带 `use-` 前缀 (例如: `use-user-profile.ts`)
+
+### API 路由
+- **路由文件**: 目录结构中的 `route.ts`
+- **中间件**: `middleware.ts`
+- **服务器操作**: kebab-case 带 `-actions` 后缀
+
+### 配置
+- **配置文件**: kebab-case 带 `.config.ts` 后缀
+- **环境变量**: `.env.local`, `.env.example`
+
+### 数据库
+- **架构文件**: `schema.ts`
+- **迁移文件**: 时间戳前缀 (例如: `0001_initial.sql`)
+- **仓库文件**: kebab-case 带 `-repository` 后缀
+
+## 导入/导出约定
+
+### 桶导出
+使用索引文件进行清晰的导入：
+
+```typescript
+// src/components/ui/index.ts
+export { Button } from './button'
+export { Card } from './card'
+export { Input } from './input'
+
+// 使用
+import { Button, Card, Input } from '@/components/ui'
+```
+
+### 路径映射
+在 `tsconfig.json` 中配置：
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/hooks/*": ["./src/hooks/*"],
+      "@/types/*": ["./src/types/*"],
+      "@/config/*": ["./src/config/*"]
+    }
+  }
+}
+```
+
+### 导入顺序
+遵循以下导入顺序：
+
+```typescript
+// 1. React 和 Next.js 导入
+import React from 'react'
+import { NextRequest, NextResponse } from 'next/server'
+
+// 2. 第三方库
+import { z } from 'zod'
+import { clsx } from 'clsx'
+
+// 3. 内部导入（绝对路径）
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/use-auth'
+import { db } from '@/server/db'
+
+// 4. 相对导入
+import './styles.css'
+```
+
+## 代码组织原则
+
+### 单一职责
+每个文件应该有一个单一、明确定义的目的：
+
+```typescript
+// 好：专注于用户认证
+// src/lib/auth/auth-client.ts
+export const authClient = createAuthClient({...})
+
+// 好：专注于文件操作
+// src/lib/file-service.ts
+export class FileService {
+  async uploadFile() {...}
+  async deleteFile() {...}
+}
+```
+
+### 依赖方向
+依赖应该向内流动：
+
+```
+UI 组件 → 钩子 → 服务 → 数据库
+```
+
+### 基于功能的组织
+将相关功能组合在一起：
+
+```
+src/features/
+├── auth/
+│   ├── components/
+│   ├── hooks/
+│   ├── services/
+│   └── types/
+├── files/
+│   ├── components/
+│   ├── hooks/
+│   ├── services/
+│   └── types/
+└── billing/
+    ├── components/
+    ├── hooks/
+    ├── services/
+    └── types/
+```
+
+## 环境配置
+
+### 环境文件
+- `.env.local` - 本地开发（不提交）
+- `.env.example` - 环境变量模板
+- `.env.production` - 生产环境变量
+
+### 环境变量结构
+```
+# 数据库
+DATABASE_URL=postgresql://...
+
+# 认证
+BETTER_AUTH_SECRET=...
+BETTER_AUTH_URL=...
+
+# OAuth 提供商
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+
+# 支付
+STRIPE_SECRET_KEY=...
+STRIPE_PUBLISHABLE_KEY=...
+
+# 文件存储
+CLOUDFLARE_R2_ACCESS_KEY_ID=...
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
+
+# 外部服务
+RESEND_API_KEY=...
+```
+
+## 构建和开发脚本
+
+### Package.json 脚本
+```json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "biome check .",
+    "lint:fix": "biome check . --apply",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:integration": "jest --config=jest.integration.config.js",
+    "test:e2e": "playwright test",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
+  }
+}
+```
+
+## 性能考虑
+
+### 代码分割
+- 对大型组件使用动态导入
+- 实现基于路由的代码分割
+- 延迟加载非关键功能
+
+### 包分析
+```bash
+# 分析包大小
+npm run build -- --analyze
+
+# 检查包组成
+npx @next/bundle-analyzer
+```
+
+### 树摇
+- 使用 ES 模块以获得更好的树摇效果
+- 避免导入整个库
+- 谨慎使用桶导出
+
+## 安全考虑
+
+### 文件组织
+- 将敏感配置保存在环境变量中
+- 清晰地分离客户端和服务器代码
+- 使用 TypeScript 确保类型安全
+
+### API 安全
+- 使用 Zod 模式验证所有输入
+- 实现适当的认证检查
+- 对表单使用 CSRF 保护
+
+
+## 最佳实践
+
+### 组件设计
+- 保持组件小而专注
+- 使用组合而不是继承
+- 实现适当的属性验证
+- 遵循无障碍指南
+
+### 状态管理
+- 对本地状态使用 React 钩子
+- 实现适当的错误边界
+- 使用服务器状态进行数据获取
+- 最小化全局状态
+
+### 性能
+- 实现适当的加载状态
+- 对昂贵的组件使用 React.memo
+- 优化图像和资源
+- 实现适当的缓存策略

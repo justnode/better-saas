@@ -1,0 +1,986 @@
+---
+title: 配置管理
+---
+Better SaaS使用集中式配置系统来管理应用程序设置、环境变量和运行时配置，具有类型安全和验证功能。
+
+## 概述
+
+配置系统提供：
+- **环境管理**: 开发、测试和生产环境
+- **功能标志**: 动态功能切换和 A/B 测试
+- **类型安全**: 所有配置的 TypeScript 验证
+- **运行时配置**: 无需重新构建的动态设置
+- **验证**: 配置验证的 Zod 模式
+- **集中管理**: 设置的单一真实来源
+
+## 环境变量
+
+### 环境文件结构
+
+```
+.env                # 本地开发（不提交）
+.env.example        # 环境变量模板
+.env.production     # 生产环境变量
+.env.staging        # 测试环境变量
+```
+
+### 核心环境变量
+
+```
+# 应用程序
+NODE_ENV=development
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_NAME="Better SaaS"
+
+# 数据库
+DATABASE_URL=postgresql://user:password@localhost:5432/bettersaas
+
+# 认证
+BETTER_AUTH_SECRET=your-super-secret-key-here
+BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000
+
+# OAuth 提供商
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# 支付 (Stripe)
+STRIPE_SECRET_KEY=sk_test_your-test-secret-key
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your-test-publishable-key
+STRIPE_WEBHOOK_SECRET=whsec_your-webhook-secret
+
+# 文件存储 (Cloudflare R2)
+CLOUDFLARE_R2_ACCESS_KEY_ID=your-access-key-id
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=your-secret-access-key
+CLOUDFLARE_R2_BUCKET_NAME=your-bucket-name
+CLOUDFLARE_R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL=https://your-domain.com
+
+# 邮件 (Resend)
+RESEND_API_KEY=your-resend-api-key
+RESEND_FROM_EMAIL=noreply@yourdomain.com
+
+# 分析（可选）
+NEXT_PUBLIC_GOOGLE_ANALYTICS_ID=GA_MEASUREMENT_ID
+NEXT_PUBLIC_POSTHOG_KEY=your-posthog-key
+NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
+
+# 监控（可选）
+SENTRY_DSN=your-sentry-dsn
+SENTRY_ORG=your-sentry-org
+SENTRY_PROJECT=your-sentry-project
+
+# 功能标志
+NEXT_PUBLIC_ENABLE_ANALYTICS=true
+NEXT_PUBLIC_ENABLE_BLOG=true
+NEXT_PUBLIC_ENABLE_DOCS=true
+NEXT_PUBLIC_ENABLE_PAYMENTS=true
+```
+
+### 环境验证
+
+```typescript
+// src/env.ts
+import { z } from 'zod'
+
+const envSchema = z.object({
+  // 应用程序
+  NODE_ENV: z.enum(['development', 'staging', 'production']).default('development'),
+  NEXT_PUBLIC_APP_URL: z.string().url(),
+  NEXT_PUBLIC_APP_NAME: z.string().default('Better SaaS'),
+
+  // 数据库
+  DATABASE_URL: z.string().url(),
+
+  // 认证
+  BETTER_AUTH_SECRET: z.string().min(32),
+  BETTER_AUTH_URL: z.string().url(),
+  BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
+
+  // OAuth
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+
+  // 支付
+  STRIPE_SECRET_KEY: z.string().optional(),
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+
+  // 文件存储
+  CLOUDFLARE_R2_ACCESS_KEY_ID: z.string().optional(),
+  CLOUDFLARE_R2_SECRET_ACCESS_KEY: z.string().optional(),
+  CLOUDFLARE_R2_BUCKET_NAME: z.string().optional(),
+  CLOUDFLARE_R2_ENDPOINT: z.string().url().optional(),
+  NEXT_PUBLIC_CLOUDFLARE_R2_PUBLIC_URL: z.string().url().optional(),
+
+  // 邮件
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().email().optional(),
+
+  // 分析
+  NEXT_PUBLIC_GOOGLE_ANALYTICS_ID: z.string().optional(),
+  NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
+  NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+
+  // 监控
+  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_ORG: z.string().optional(),
+  SENTRY_PROJECT: z.string().optional(),
+
+  // 功能标志
+  NEXT_PUBLIC_ENABLE_ANALYTICS: z.string().transform(val => val === 'true').default('false'),
+  NEXT_PUBLIC_ENABLE_BLOG: z.string().transform(val => val === 'true').default('true'),
+  NEXT_PUBLIC_ENABLE_DOCS: z.string().transform(val => val === 'true').default('true'),
+  NEXT_PUBLIC_ENABLE_PAYMENTS: z.string().transform(val => val === 'true').default('true'),
+})
+
+export const env = envSchema.parse(process.env)
+
+export type Env = z.infer<typeof envSchema>
+```
+
+## 应用程序配置
+
+### 核心应用配置
+
+```typescript
+// src/config/app.config.ts
+import { env } from '@/env'
+
+export const APP_CONFIG = {
+  name: env.NEXT_PUBLIC_APP_NAME,
+  url: env.NEXT_PUBLIC_APP_URL,
+  description: '基于 Next.js 构建的现代 SaaS 应用程序',
+  
+  // 应用程序元数据
+  meta: {
+    title: 'Better SaaS - 现代 SaaS 模板',
+    description: '使用 Next.js、TypeScript 和现代工具构建您的 SaaS 应用程序',
+    keywords: ['SaaS', 'Next.js', 'TypeScript', 'React', 'Tailwind CSS'],
+    author: 'Better SaaS 团队',
+    version: '1.0.0',
+  },
+
+  // 社交媒体和品牌
+  social: {
+    twitter: '@bettersaas',
+    github: 'https://github.com/yourusername/better-saas',
+    discord: 'https://discord.gg/yourinvite',
+  },
+
+  // 联系信息
+  contact: {
+    email: 'hello@bettersaas.com',
+    support: 'support@bettersaas.com',
+  },
+
+  // 法律信息
+  legal: {
+    company: 'Better SaaS Inc.',
+    address: '123 Main St, San Francisco, CA 94105',
+    privacyPolicy: '/privacy',
+    termsOfService: '/terms',
+  },
+
+  // 默认设置
+  defaults: {
+    locale: 'zh',
+    theme: 'light',
+    currency: 'CNY',
+    timezone: 'Asia/Shanghai',
+  },
+} as const
+
+export type AppConfig = typeof APP_CONFIG
+```
+
+### 功能配置
+
+```typescript
+// src/config/features.config.ts
+import { env } from '@/env'
+
+export const FEATURES_CONFIG = {
+  // 核心功能
+  authentication: {
+    enabled: true,
+    providers: {
+      email: true,
+      github: !!env.GITHUB_CLIENT_ID,
+      google: !!env.GOOGLE_CLIENT_ID,
+    },
+    features: {
+      registration: true,
+      emailVerification: false,
+      twoFactorAuth: false,
+      passwordReset: true,
+    },
+  },
+
+  // 支付功能
+  payments: {
+    enabled: env.NEXT_PUBLIC_ENABLE_PAYMENTS,
+    provider: 'stripe',
+    features: {
+      subscriptions: true,
+      oneTimePayments: true,
+      invoices: true,
+      refunds: true,
+    },
+    plans: {
+      basic: {
+        id: 'basic',
+        name: '基础版',
+        price: 9.99,
+        interval: 'month',
+        features: ['5 个项目', '10GB 存储', '邮件支持'],
+      },
+      pro: {
+        id: 'pro',
+        name: '专业版',
+        price: 29.99,
+        interval: 'month',
+        features: ['无限项目', '100GB 存储', '优先支持'],
+      },
+    },
+  },
+
+  // 文件管理
+  fileManagement: {
+    enabled: true,
+    provider: 'r2',
+    limits: {
+      maxFileSize: 10 * 1024 * 1024, // 10MB
+      maxFiles: 1000,
+      allowedTypes: ['image/jpeg', 'image/png', 'application/pdf'],
+    },
+    features: {
+      thumbnails: true,
+      sharing: true,
+      folders: true,
+      search: true,
+    },
+  },
+
+  // 分析
+  analytics: {
+    enabled: env.NEXT_PUBLIC_ENABLE_ANALYTICS,
+    providers: {
+      googleAnalytics: !!env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID,
+      posthog: !!env.NEXT_PUBLIC_POSTHOG_KEY,
+    },
+  },
+
+  // 内容功能
+  content: {
+    blog: {
+      enabled: env.NEXT_PUBLIC_ENABLE_BLOG,
+      features: {
+        comments: false,
+        rss: true,
+        search: true,
+        categories: true,
+      },
+    },
+    docs: {
+      enabled: env.NEXT_PUBLIC_ENABLE_DOCS,
+      features: {
+        search: true,
+        feedback: true,
+        editOnGithub: true,
+      },
+    },
+  },
+
+  // 管理员功能
+  admin: {
+    enabled: true,
+    features: {
+      userManagement: true,
+      analytics: true,
+      systemSettings: true,
+      auditLog: true,
+    },
+  },
+
+  // 国际化
+  i18n: {
+    enabled: true,
+    defaultLocale: 'zh',
+    locales: ['en', 'zh'],
+    features: {
+      autoDetect: true,
+      localizedRouting: true,
+    },
+  },
+} as const
+
+export type FeaturesConfig = typeof FEATURES_CONFIG
+```
+
+### 主题配置
+
+```typescript
+// src/config/theme.config.ts
+export const THEME_CONFIG = {
+  // 颜色方案
+  colors: {
+    light: {
+      primary: 'hsl(221, 83%, 53%)',
+      secondary: 'hsl(210, 40%, 98%)',
+      accent: 'hsl(210, 40%, 96%)',
+      background: 'hsl(0, 0%, 100%)',
+      foreground: 'hsl(222, 84%, 5%)',
+      muted: 'hsl(210, 40%, 96%)',
+      border: 'hsl(214, 32%, 91%)',
+    },
+    dark: {
+      primary: 'hsl(221, 83%, 53%)',
+      secondary: 'hsl(217, 33%, 17%)',
+      accent: 'hsl(217, 33%, 17%)',
+      background: 'hsl(222, 84%, 5%)',
+      foreground: 'hsl(210, 40%, 98%)',
+      muted: 'hsl(217, 33%, 17%)',
+      border: 'hsl(217, 33%, 17%)',
+    },
+  },
+
+  // 排版
+  typography: {
+    fontFamily: {
+      sans: ['Inter', 'system-ui', 'sans-serif'],
+      mono: ['Fira Code', 'monospace'],
+    },
+    fontSize: {
+      xs: '0.75rem',
+      sm: '0.875rem',
+      base: '1rem',
+      lg: '1.125rem',
+      xl: '1.25rem',
+      '2xl': '1.5rem',
+      '3xl': '1.875rem',
+      '4xl': '2.25rem',
+    },
+  },
+
+  // 布局
+  layout: {
+    containerMaxWidth: '1200px',
+    sidebarWidth: '240px',
+    headerHeight: '64px',
+    footerHeight: '80px',
+  },
+
+  // 动画
+  animation: {
+    duration: {
+      fast: '150ms',
+      normal: '300ms',
+      slow: '500ms',
+    },
+    easing: {
+      default: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      in: 'cubic-bezier(0.4, 0, 1, 1)',
+      out: 'cubic-bezier(0, 0, 0.2, 1)',
+    },
+  },
+
+  // 断点
+  breakpoints: {
+    sm: '640px',
+    md: '768px',
+    lg: '1024px',
+    xl: '1280px',
+    '2xl': '1536px',
+  },
+} as const
+
+export type ThemeConfig = typeof THEME_CONFIG
+```
+
+## 导航配置
+
+```typescript
+// src/config/navbar.config.ts
+import { FEATURES_CONFIG } from './features.config'
+
+export const NAVBAR_CONFIG = {
+  // 主导航
+  main: [
+    {
+      title: '首页',
+      href: '/',
+      icon: 'home',
+    },
+    {
+      title: '功能',
+      href: '/features',
+      icon: 'features',
+    },
+    {
+      title: '定价',
+      href: '/pricing',
+      icon: 'pricing',
+    },
+    ...(FEATURES_CONFIG.content.blog.enabled ? [{
+      title: '博客',
+      href: '/blog',
+      icon: 'blog',
+    }] : []),
+    ...(FEATURES_CONFIG.content.docs.enabled ? [{
+      title: '文档',
+      href: '/docs',
+      icon: 'docs',
+    }] : []),
+  ],
+
+  // 仪表板导航
+  dashboard: [
+    {
+      title: '概览',
+      href: '/dashboard',
+      icon: 'dashboard',
+    },
+    {
+      title: '项目',
+      href: '/dashboard/projects',
+      icon: 'projects',
+    },
+    ...(FEATURES_CONFIG.fileManagement.enabled ? [{
+      title: '文件',
+      href: '/dashboard/files',
+      icon: 'files',
+    }] : []),
+    ...(FEATURES_CONFIG.payments.enabled ? [{
+      title: '账单',
+      href: '/dashboard/billing',
+      icon: 'billing',
+    }] : []),
+    {
+      title: '设置',
+      href: '/dashboard/settings',
+      icon: 'settings',
+    },
+  ],
+
+  // 管理员导航
+  admin: [
+    {
+      title: '用户',
+      href: '/admin/users',
+      icon: 'users',
+      permission: 'manage:users',
+    },
+    {
+      title: '分析',
+      href: '/admin/analytics',
+      icon: 'analytics',
+      permission: 'view:analytics',
+    },
+    {
+      title: '设置',
+      href: '/admin/settings',
+      icon: 'settings',
+      permission: 'manage:settings',
+    },
+  ],
+
+  // 页脚导航
+  footer: {
+    product: [
+      { title: '功能', href: '/features' },
+      { title: '定价', href: '/pricing' },
+      { title: '更新日志', href: '/changelog' },
+    ],
+    company: [
+      { title: '关于我们', href: '/about' },
+      { title: '联系我们', href: '/contact' },
+      { title: '招聘', href: '/careers' },
+    ],
+    legal: [
+      { title: '隐私政策', href: '/privacy' },
+      { title: '服务条款', href: '/terms' },
+      { title: '安全', href: '/security' },
+    ],
+  },
+} as const
+
+export type NavbarConfig = typeof NAVBAR_CONFIG
+```
+
+## 支付配置
+
+```typescript
+// src/config/payment.config.ts
+import { env } from '@/env'
+
+export const PAYMENT_CONFIG = {
+  // 提供商配置
+  provider: 'stripe',
+  enabled: env.NEXT_PUBLIC_ENABLE_PAYMENTS,
+  
+  // 货币设置
+  currency: 'CNY',
+  locale: 'zh-CN',
+
+  // 订阅计划
+  plans: {
+    basic: {
+      id: 'basic',
+      name: '基础版',
+      description: '适合个人和小团队',
+      price: 68,
+      interval: 'month',
+      stripePriceId: 'price_basic_monthly',
+      features: [
+        '最多 5 个项目',
+        '10GB 存储空间',
+        '邮件支持',
+        '基础分析',
+      ],
+      limits: {
+        projects: 5,
+        storage: 10 * 1024 * 1024 * 1024, // 10GB
+        users: 1,
+        apiCalls: 1000,
+      },
+    },
+    pro: {
+      id: 'pro',
+      name: '专业版',
+      description: '适合成长中的团队和企业',
+      price: 198,
+      interval: 'month',
+      stripePriceId: 'price_pro_monthly',
+      features: [
+        '无限项目',
+        '100GB 存储空间',
+        '优先支持',
+        '高级分析',
+        '团队协作',
+      ],
+      limits: {
+        projects: -1, // 无限制
+        storage: 100 * 1024 * 1024 * 1024, // 100GB
+        users: 10,
+        apiCalls: 10000,
+      },
+    },
+    enterprise: {
+      id: 'enterprise',
+      name: '企业版',
+      description: '适合有高级需求的大型组织',
+      price: 688,
+      interval: 'month',
+      stripePriceId: 'price_enterprise_monthly',
+      features: [
+        '专业版所有功能',
+        '1TB 存储空间',
+        '专属支持',
+        '自定义集成',
+        'SLA 保证',
+      ],
+      limits: {
+        projects: -1, // 无限制
+        storage: 1024 * 1024 * 1024 * 1024, // 1TB
+        users: -1, // 无限制
+        apiCalls: -1, // 无限制
+      },
+    },
+  },
+
+  // 账单设置
+  billing: {
+    trialPeriod: 14, // 天
+    gracePeriod: 3, // 天
+    invoicePrefix: 'INV-',
+    taxRate: 0.13, // 13%
+  },
+
+  // 按计划的功能访问
+  features: {
+    basic: [
+      'projects',
+      'storage',
+      'support',
+      'analytics',
+    ],
+    pro: [
+      'projects',
+      'storage',
+      'support',
+      'analytics',
+      'collaboration',
+      'integrations',
+    ],
+    enterprise: [
+      'projects',
+      'storage',
+      'support',
+      'analytics',
+      'collaboration',
+      'integrations',
+      'sla',
+      'custom',
+    ],
+  },
+} as const
+
+export type PaymentConfig = typeof PAYMENT_CONFIG
+export type PlanId = keyof typeof PAYMENT_CONFIG.plans
+export type Plan = typeof PAYMENT_CONFIG.plans[PlanId]
+```
+
+## 配置验证
+
+### 运行时配置验证
+
+```typescript
+// src/lib/config-validation.ts
+import { z } from 'zod'
+
+// 配置模式
+const appConfigSchema = z.object({
+  name: z.string().min(1),
+  url: z.string().url(),
+  description: z.string().min(1),
+  meta: z.object({
+    title: z.string().min(1),
+    description: z.string().min(1),
+    keywords: z.array(z.string()),
+    author: z.string().min(1),
+    version: z.string().min(1),
+  }),
+})
+
+const featuresConfigSchema = z.object({
+  authentication: z.object({
+    enabled: z.boolean(),
+    providers: z.object({
+      email: z.boolean(),
+      github: z.boolean(),
+      google: z.boolean(),
+    }),
+  }),
+  payments: z.object({
+    enabled: z.boolean(),
+    provider: z.enum(['stripe', 'paddle']),
+  }),
+  fileManagement: z.object({
+    enabled: z.boolean(),
+    provider: z.enum(['r2', 's3']),
+    limits: z.object({
+      maxFileSize: z.number().positive(),
+      maxFiles: z.number().positive(),
+      allowedTypes: z.array(z.string()),
+    }),
+  }),
+})
+
+// 验证函数
+export function validateAppConfig(config: unknown) {
+  return appConfigSchema.parse(config)
+}
+
+export function validateFeaturesConfig(config: unknown) {
+  return featuresConfigSchema.parse(config)
+}
+
+// 带验证的配置加载器
+export function loadConfig<T>(
+  configLoader: () => T,
+  validator: (config: unknown) => T
+): T {
+  try {
+    const config = configLoader()
+    return validator(config)
+  } catch (error) {
+    console.error('配置验证失败:', error)
+    throw new Error('无效的配置')
+  }
+}
+```
+
+## 配置钩子
+
+### useConfig 钩子
+
+```typescript
+// src/hooks/use-config.ts
+import { useContext, createContext, ReactNode } from 'react'
+import { APP_CONFIG, AppConfig } from '@/config/app.config'
+import { FEATURES_CONFIG, FeaturesConfig } from '@/config/features.config'
+import { THEME_CONFIG, ThemeConfig } from '@/config/theme.config'
+
+interface ConfigContextType {
+  app: AppConfig
+  features: FeaturesConfig
+  theme: ThemeConfig
+}
+
+const ConfigContext = createContext<ConfigContextType | undefined>(undefined)
+
+export function ConfigProvider({ children }: { children: ReactNode }) {
+  const config = {
+    app: APP_CONFIG,
+    features: FEATURES_CONFIG,
+    theme: THEME_CONFIG,
+  }
+
+  return (
+    <ConfigContext.Provider value={config}>
+      {children}
+    </ConfigContext.Provider>
+  )
+}
+
+export function useConfig() {
+  const context = useContext(ConfigContext)
+  if (!context) {
+    throw new Error('useConfig 必须在 ConfigProvider 内使用')
+  }
+  return context
+}
+
+// 特定配置钩子
+export function useAppConfig() {
+  const { app } = useConfig()
+  return app
+}
+
+export function useFeaturesConfig() {
+  const { features } = useConfig()
+  return features
+}
+
+export function useThemeConfig() {
+  const { theme } = useConfig()
+  return theme
+}
+```
+
+## 功能标志
+
+### 功能标志系统
+
+```typescript
+// src/lib/feature-flags.ts
+import { FEATURES_CONFIG } from '@/config/features.config'
+
+export type FeatureFlag = keyof typeof FEATURES_CONFIG
+
+export function isFeatureEnabled(feature: FeatureFlag): boolean {
+  const config = FEATURES_CONFIG[feature]
+  return typeof config === 'object' && 'enabled' in config 
+    ? config.enabled 
+    : Boolean(config)
+}
+
+export function getFeatureConfig<T extends FeatureFlag>(
+  feature: T
+): typeof FEATURES_CONFIG[T] {
+  return FEATURES_CONFIG[feature]
+}
+
+// 功能标志组件
+export function FeatureFlag({ 
+  feature, 
+  children, 
+  fallback = null 
+}: {
+  feature: FeatureFlag
+  children: React.ReactNode
+  fallback?: React.ReactNode
+}) {
+  if (!isFeatureEnabled(feature)) {
+    return <>{fallback}</>
+  }
+  
+  return <>{children}</>
+}
+
+// 功能标志钩子
+export function useFeatureFlag(feature: FeatureFlag) {
+  return isFeatureEnabled(feature)
+}
+```
+
+## 配置管理
+
+### 动态配置
+
+```typescript
+// src/lib/dynamic-config.ts
+import { useState, useEffect } from 'react'
+
+interface DynamicConfig {
+  maintenance: boolean
+  announcements: string[]
+  experimentalFeatures: Record<string, boolean>
+}
+
+export function useDynamicConfig() {
+  const [config, setConfig] = useState<DynamicConfig>({
+    maintenance: false,
+    announcements: [],
+    experimentalFeatures: {},
+  })
+
+  useEffect(() => {
+    // 从 API 加载动态配置
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(setConfig)
+      .catch(console.error)
+  }, [])
+
+  return config
+}
+
+// 服务器端动态配置
+export async function getDynamicConfig(): Promise<DynamicConfig> {
+  // 这可以从数据库、外部 API 或配置服务获取
+  return {
+    maintenance: process.env.MAINTENANCE_MODE === 'true',
+    announcements: process.env.ANNOUNCEMENTS?.split(',') || [],
+    experimentalFeatures: {
+      newDashboard: process.env.EXPERIMENTAL_NEW_DASHBOARD === 'true',
+      betaFeatures: process.env.EXPERIMENTAL_BETA_FEATURES === 'true',
+    },
+  }
+}
+```
+
+### 配置 API
+
+```typescript
+// src/app/api/config/route.ts
+import { NextResponse } from 'next/server'
+import { getDynamicConfig } from '@/lib/dynamic-config'
+
+export async function GET() {
+  try {
+    const config = await getDynamicConfig()
+    return NextResponse.json(config)
+  } catch (error) {
+    return NextResponse.json(
+      { error: '加载配置失败' },
+      { status: 500 }
+    )
+  }
+}
+```
+
+## 环境特定配置
+
+### 开发配置
+
+```typescript
+// src/config/development.config.ts
+export const DEVELOPMENT_CONFIG = {
+  debug: true,
+  logging: {
+    level: 'debug',
+    console: true,
+    file: false,
+  },
+  database: {
+    logging: true,
+    ssl: false,
+  },
+  cache: {
+    enabled: false,
+  },
+  rateLimit: {
+    enabled: false,
+  },
+} as const
+```
+
+### 生产配置
+
+```typescript
+// src/config/production.config.ts
+export const PRODUCTION_CONFIG = {
+  debug: false,
+  logging: {
+    level: 'error',
+    console: false,
+    file: true,
+  },
+  database: {
+    logging: false,
+    ssl: true,
+  },
+  cache: {
+    enabled: true,
+    ttl: 3600,
+  },
+  rateLimit: {
+    enabled: true,
+    windowMs: 15 * 60 * 1000, // 15 分钟
+    max: 100,
+  },
+} as const
+```
+
+## 测试配置
+
+### 测试配置
+
+```typescript
+// src/config/test.config.ts
+export const TEST_CONFIG = {
+  database: {
+    url: 'postgresql://test:test@localhost:5432/bettersaas_test',
+    logging: false,
+  },
+  auth: {
+    secret: 'test-secret-key',
+    skipVerification: true,
+  },
+  storage: {
+    provider: 'memory',
+  },
+  email: {
+    provider: 'mock',
+  },
+} as const
+```
+
+## 最佳实践
+
+### 配置组织
+
+1. **关注点分离**: 将不同类型的配置保存在单独的文件中
+2. **类型安全**: 对所有配置使用 TypeScript
+3. **验证**: 在启动时验证配置
+4. **环境变量**: 对敏感数据使用环境变量
+5. **默认值**: 为所有配置提供合理的默认值
+
+### 安全考虑
+
+1. **密钥管理**: 永远不要将密钥提交到版本控制
+2. **环境分离**: 对不同环境使用不同的配置
+3. **验证**: 验证所有配置输入
+4. **访问控制**: 限制对配置端点的访问
+
+### 性能优化
+
+1. **延迟加载**: 仅在需要时加载配置
+2. **缓存**: 缓存配置以避免重复读取
+3. **打包**: 为客户端打包优化配置
+
+## 故障排除
+
+### 常见问题
+
+1. **缺少环境变量**: 检查 `.env.example` 中的必需变量
+2. **无效配置**: 使用验证模式及早捕获错误
+3. **类型错误**: 确保所有配置都正确类型化
+4. **运行时错误**: 在应用程序启动时验证配置
+

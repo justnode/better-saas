@@ -1,156 +1,403 @@
 ---
 title: 快速开始
 ---
+**5分钟内**让您的 Better SaaS 项目启动并运行！本指南将引导您完成从安装到运行第一个 SaaS 应用程序的完整设置过程。
 
-## 介绍
+## 🚀 概览
+完成本指南后，您将拥有：
+- ✅ 在本地运行的完全功能的 SaaS 应用程序
+- ✅ 带有登录/注册的身份认证系统
+- ✅ 配置并运行的数据库
+- ✅ 准备好测试的支付系统
+- ✅ 可操作的文件管理系统
+- ✅ 启用的多语言支持
 
-几分钟内让您的 Better SaaS 项目运行起来。本指南将引导您完成从安装到运行第一个 SaaS 应用程序的完整设置过程。
-
-## 前置要求
+## 📋 前置要求
 
 开始之前，请确保您的系统已安装以下软件：
 
+### 必需软件
 - **Node.js 18+** - [下载 Node.js](https://nodejs.org/)
 - **pnpm** - 包管理器 (`npm install -g pnpm`)
-- **PostgreSQL** - 数据库服务器
-- **Git** - 版本控制系统
+- **PostgreSQL** - 数据库托管商([Neon](https://neon.tech/))或本地数据库服务器
+- **Git** - 版本控制系统 ([下载 Git](https://git-scm.com/))
 
-### 可选服务
+### 可选服务（获得完整功能）
+- **Stripe 账户** - 用于支付处理 ([注册](https://stripe.com/))
+- **Cloudflare R2** 或 **AWS S3** - 用于文件存储
+- **GitHub OAuth 应用** - 用于社交登录
+- **Google OAuth 应用** - 用于社交登录
 
-为了获得完整功能，您还需要：
+## ⚡ 5分钟设置
 
-- **Stripe 账户** - 用于支付处理
-- **AWS S3 或 Cloudflare R2** - 用于文件存储
-- **GitHub/Google OAuth 应用** - 用于社交登录
-
-## 安装
-
-### 1. 克隆仓库
+### 步骤 1：克隆仓库
 
 ```bash
-git clone <repository-url>
+# 克隆仓库
+git clone https://github.com/justnode/better-saas
+cd better-saas
+
+# 或使用 GitHub CLI
+gh repo clone https://github.com/justnode/better-saas
 cd better-saas
 ```
 
-### 2. 安装依赖
+### 步骤 2：安装依赖
 
 ```bash
+# 安装所有依赖
 pnpm install
+
+# 这将安装：
+# - Next.js 15 和 React 18
+# - TypeScript 和所有类型定义
+# - Tailwind CSS 和 UI 组件
+# - 数据库工具 (Drizzle ORM)
+# - 测试框架 (Jest, Playwright)
+# - 以及所有其他项目依赖
 ```
 
-### 3. 环境配置
-
-复制环境变量示例文件并进行配置：
+### 步骤 3：环境配置
 
 ```bash
+# 复制环境变量模板
 cp env.example .env
+
+# 在编辑器中打开 .env 文件
+code .env  # VS Code
+# 或
+vim .env  # 终端编辑器
 ```
 
-编辑 `.env` 文件，配置您的环境变量：
+**配置基本的环境变量：**
 
-```
-# 应用 URL
+```bash
+# 应用配置
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
-# 数据库
-DATABASE_URL="postgresql://user:password@localhost:5432/database"
+# 数据库（必需）
+DATABASE_URL="postgresql://username:password@localhost:5432/better_saas"
 
-# 认证
-BETTER_AUTH_SECRET="your-secret-key"
-
-# OAuth 提供商（可选）
-GITHUB_CLIENT_ID="your-github-client-id"
-GITHUB_CLIENT_SECRET="your-github-client-secret"
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
-
-# 文件存储（可选）
-R2_BUCKET_NAME="your-bucket-name"
-R2_ACCESS_KEY_ID="your-access-key-id"
-R2_SECRET_ACCESS_KEY="your-secret-access-key"
-R2_ENDPOINT="https://your-account-id.r2.cloudflarestorage.com"
-R2_PUBLIC_URL="https://your-domain.com"
-
-# Stripe 支付（可选）
-STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key"
-STRIPE_WEBHOOK_SECRET="whsec_your_webhook_secret"
-NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY="price_xxx"
-NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY="price_xxx"
+# 身份认证（必需）
+BETTER_AUTH_SECRET="your-super-secret-key-here"
 
 # 管理员配置
 ADMIN_EMAILS="admin@example.com"
 ```
 
-### 4. 数据库设置
-
-使用所需的模式初始化数据库：
+### 步骤 4：数据库设置
+登录Neon，创建一个新项目，在项目面板中点击"Connect",找到数据库URL，将数据库URL添加到 .env 文件中。
 
 ```bash
+# 将Neon中的数据库URL添加到 .env 文件中
+DATABASE_URL="your-neon-database-url"
+
+# 推送数据库架构
 pnpm db:push
+
+# 这将：
+# - 创建所有必要的表
+# - 初始化数据库结构
 ```
 
-### 5. 启动开发服务器
-
-启动开发服务器：
+### 步骤 5：启动开发服务器
 
 ```bash
+# 启动开发服务器
+pnpm dev
+
+# 应用程序将在以下地址可用：
+# http://localhost:3000
+```
+
+🎉 **恭喜！** 您的 Better SaaS 应用程序现在正在运行！
+
+## 🔧 完整配置
+
+为了获得完整功能，请配置这些额外的服务：
+
+### 支付集成（Stripe）
+
+1. **在 [stripe.com](https://stripe.com/) 创建 Stripe 账户**
+2. **从 Stripe 仪表板获取您的 API 密钥**
+3. **添加到您的 `.env` 文件：**
+
+```bash
+# Stripe 配置
+STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key"
+STRIPE_WEBHOOK_SECRET="whsec_your_webhook_secret"
+NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY="price_monthly_id"
+NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY="price_yearly_id"
+```
+
+4. **在您的 Stripe 仪表板中创建产品和价格**
+5. **为支付事件设置 webhook 端点**
+
+### 文件存储（Cloudflare R2）
+
+1. **创建 Cloudflare 账户并设置 R2**
+2. **创建存储桶**
+3. **添加到您的 `.env` 文件：**
+
+```bash
+# Cloudflare R2 配置
+R2_BUCKET_NAME="your-bucket-name"
+R2_ACCESS_KEY_ID="your-access-key-id"
+R2_SECRET_ACCESS_KEY="your-secret-access-key"
+R2_ENDPOINT="https://your-account-id.r2.cloudflarestorage.com"
+R2_PUBLIC_URL="https://your-domain.com"
+```
+
+### 社交登录
+
+#### GitHub OAuth
+1. **创建 GitHub OAuth 应用：**
+   - 转到 GitHub 设置 → 开发者设置 → OAuth 应用
+   - 创建新的 OAuth 应用
+   - 设置授权回调 URL 为：`http://localhost:3000/api/auth/callback/github`
+
+2. **添加到您的 `.env` 文件：**
+
+```bash
+# GitHub OAuth
+GITHUB_CLIENT_ID="your-github-client-id"
+GITHUB_CLIENT_SECRET="your-github-client-secret"
+```
+
+#### Google OAuth
+
+1. **创建 Google OAuth 应用：**
+   - 转到 [Google Cloud Console](https://console.cloud.google.com/)
+   - 创建新项目或选择现有项目
+   - 启用 Google+ API
+   - 创建 OAuth 2.0 凭据
+   - 设置重定向 URI 为：`http://localhost:3000/api/auth/callback/google`
+
+2. **添加到您的 `.env` 文件：**
+
+```bash
+# Google OAuth
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+```
+
+## 🎯 探索您的应用程序
+
+### 1. 身份认证系统
+
+访问 `http://localhost:3000/login` 进行测试：
+- ✅ **邮箱/密码登录** - 创建账户并登录
+- ✅ **社交登录** - 尝试 GitHub 或 Google 身份认证
+- ✅ **密码重置** - 测试密码重置流程
+- ✅ **用户注册** - 创建新用户账户
+
+### 2. 仪表板功能
+
+在 `http://localhost:3000/dashboard` 访问仪表板：
+- ✅ **用户仪表板** - 个人用户界面
+- ✅ **管理员仪表板** - 管理控制（管理员用户）
+- ✅ **文件管理** - 上传和管理文件
+- ✅ **用户管理** - 管理员用户管理界面
+
+### 3. 支付系统
+
+在 `http://localhost:3000/pricing` 测试支付流程：
+- ✅ **订阅计划** - 查看可用的定价计划
+- ✅ **支付处理** - 使用 Stripe 测试卡进行测试
+- ✅ **账单管理** - 管理订阅和发票
+- ✅ **客户门户** - 自助服务账单门户
+
+### 4. 文件管理
+
+在 `http://localhost:3000/dashboard/files` 尝试文件操作：
+- ✅ **文件上传** - 拖放文件上传
+- ✅ **图像处理** - 自动缩略图生成
+- ✅ **文件组织** - 组织和管理文件
+- ✅ **访问控制** - 文件权限和共享
+
+### 5. 国际化
+
+测试语言切换：
+- ✅ **语言切换** - 在中文和英文之间切换
+- ✅ **本地化内容** - 所有 UI 文本都已翻译
+- ✅ **本地化路由** - URL 根据语言变化
+- ✅ **日期/货币格式** - 正确的本地化格式
+
+## 🛠️ 开发命令
+
+以下是开发的基本命令：
+
+### 开发服务器
+```bash
+# 启动带热重载的开发服务器
+pnpm dev
+
+# 使用特定端口启动
+pnpm dev -- --port 3001
+
+# 使用 turbo 模式启动（更快的构建）
+pnpm dev --turbo
+```
+
+### 数据库操作
+```bash
+# 将架构更改推送到数据库
+pnpm db:push
+
+# 生成数据库迁移
+pnpm db:generate
+
+# 运行数据库迁移
+pnpm db:migrate
+
+# 打开数据库工作室（GUI）
+pnpm db:studio
+```
+
+### 代码质量
+```bash
+# 运行 TypeScript 类型检查
+pnpm typecheck
+
+# 运行代码格式化和检查
+pnpm check
+
+# 修复代码格式问题
+pnpm check:write
+```
+
+### 测试
+```bash
+# 运行所有测试
+pnpm test
+
+# 仅运行单元测试
+pnpm test:unit
+
+# 运行集成测试
+pnpm test:integration
+
+# 运行端到端测试
+pnpm test:e2e
+
+# 运行带覆盖率的测试
+pnpm test:coverage
+```
+
+### 构建和生产
+```bash
+# 为生产构建
+pnpm build
+
+# 启动生产服务器
+pnpm start
+
+# 构建并启动（组合）
+pnpm preview
+```
+
+## 🔍 验证清单
+
+验证您的设置是否正常工作：
+
+### ✅ 基本功能
+- [ ] 应用程序在 `http://localhost:3000` 加载
+- [ ] 浏览器开发者工具中没有控制台错误
+- [ ] 数据库连接正常工作
+- [ ] 环境变量正确加载
+
+### ✅ 身份认证
+- [ ] 用户注册正常工作
+- [ ] 邮箱/密码登录正常工作
+- [ ] 社交登录正常工作（如果已配置）
+- [ ] 受保护的路由重定向到登录页面
+- [ ] 用户会话正确持久化
+
+### ✅ 数据库
+- [ ] 数据库表已创建
+- [ ] 用户数据正确存储
+- [ ] 数据库工作室无错误打开
+- [ ] 迁移成功运行
+
+### ✅ 文件系统
+- [ ] 文件上传正常工作
+- [ ] 图像处理正确
+- [ ] 文件存储在配置位置
+- [ ] 文件权限正常工作
+
+### ✅ 支付系统（如果已配置）
+- [ ] Stripe 集成正常工作
+- [ ] 测试支付正确处理
+- [ ] Webhook 端点接收事件
+- [ ] 订阅管理正常工作
+
+## 🚨 常见问题与解决方案
+
+### 环境变量未加载
+
+**问题：** 环境变量未定义
+```bash
+# 确保 .env 文件在根目录
+ls -la .env
+
+# 检查文件权限
+chmod 644 .env
+
+# 重启开发服务器
 pnpm dev
 ```
 
-在浏览器中打开 [http://localhost:3000](http://localhost:3000) 查看您的应用程序运行情况。
+### 端口已被占用
 
-## 核心功能
+**问题：** `端口 3000 已被占用`
+```bash
+# 查找并终止使用端口 3000 的进程
+lsof -ti:3000 | xargs kill -9
 
-您的 Better SaaS 应用程序包含：
+# 或使用不同端口
+pnpm dev -- --port 3001
+```
 
-- **🔐 身份认证** - 使用 Better Auth 的邮箱/密码和社交登录
-- **💳 支付系统** - Stripe 集成和订阅管理
-- **📁 文件管理** - 云存储文件上传和管理
-- **🌍 国际化** - 多语言支持（中文/英文）
-- **📱 响应式设计** - 使用 Radix UI 和 Tailwind CSS 的现代 UI
-- **📖 文档系统** - 使用 Fumadocs 的内置文档系统
-- **🔒 受保护路由** - 基于角色的访问控制
-- **👥 管理面板** - 用户管理和系统管理
+### Node.js 版本问题
 
-## 可用脚本
+**问题：** `不支持的 Node.js 版本`
+```bash
+# 检查您的 Node.js 版本
+node --version
 
-### 开发
-- `pnpm dev` - 启动开发服务器
-- `pnpm build` - 构建生产版本
-- `pnpm start` - 启动生产服务器
+# 更新到 Node.js 18+
+nvm install 18
+nvm use 18
+```
 
-### 代码质量
-- `pnpm check` - 运行代码质量检查
-- `pnpm check:write` - 修复代码质量问题
-- `pnpm typecheck` - 运行 TypeScript 检查
+## 📚 下一步
 
-### 数据库
-- `pnpm db:generate` - 生成数据库迁移
-- `pnpm db:migrate` - 运行数据库迁移
-- `pnpm db:push` - 推送模式更改到数据库
-- `pnpm db:studio` - 打开数据库工作室
+现在您的应用程序正在运行，接下来要做的是：
 
-### 测试
-- `pnpm test` - 运行所有测试
-- `pnpm test:unit` - 运行单元测试
-- `pnpm test:integration` - 运行集成测试
-- `pnpm test:e2e` - 运行端到端测试
+### 1. **探索功能**
+- 阅读**项目架构**章节了解系统设计
+- 查看**项目特色**章节获取详细的功能说明
 
-### 管理
-- `pnpm admin:setup` - 设置管理员用户账户
+### 2. **自定义您的应用程序**
+- 按照**自定义配置**章节使其成为您自己的
+- 更新品牌、颜色和内容以匹配您的需求
 
-## 下一步
+### 3. **添加您的内容**
+- 用您自己的内容替换占位符内容
+- 配置您的定价计划和功能
+- 设置您的域名和品牌
 
-1. **探索应用程序** - 浏览仪表板和功能
-2. **配置服务** - 设置 Stripe、OAuth 提供商和文件存储
-3. **自定义内容** - 更新首页、定价和文档
-4. **部署** - 按照部署指南发布您的应用程序
+### 4. **部署到生产环境**
+- 按照**代码部署**章节进行生产设置
+- 配置生产环境变量
+- 设置监控和分析
 
-## 需要帮助？
 
-- 查看[架构](/docs/architecture)文档
-- 查看 README 中的项目结构
-- 探索全面的测试套件
-- 加入我们的社区获取支持
+## 🎉 您准备好了！
 
-立即开始构建您的下一个 SaaS 应用程序！ 
+恭喜！您现在拥有一个在本地运行的完全功能的 SaaS 应用程序。构建下一个伟大产品的基础已经奠定。
+
+**需要帮助？** 扫码添加作者微信，邀请你进入专属微信群，获取更多项目信息和使用教程。
+<div className="flex justify-center">
+  <img src="/images/wechat.png" alt="WeChat" className="w-1/2 h-auto" />
+</div>

@@ -1,0 +1,1002 @@
+---
+title: Payment & Billing
+description: Comprehensive payment and billing system with Stripe integration, subscription management, and automated billing workflows
+---
+
+# Payment & Billing
+
+Better SaaS includes a complete payment and billing system built with Stripe, featuring subscription management, automated billing, webhook handling, and comprehensive billing dashboard.
+
+## Overview
+
+The payment system provides:
+- **Stripe Integration**: Secure payment processing with Stripe
+- **Subscription Management**: Flexible subscription plans and billing cycles
+- **Webhook Handling**: Automated subscription status updates
+- **Billing Dashboard**: Complete billing history and management
+- **Invoice Generation**: Automated invoice creation and delivery
+- **Payment Methods**: Support for cards, digital wallets, and more
+- **Tax Calculation**: Automatic tax calculation and compliance
+- **Dunning Management**: Automated retry logic for failed payments
+
+## Stripe Configuration
+
+### Environment Setup
+
+```
+# Stripe Configuration
+STRIPE_SECRET_KEY=sk_live_your_stripe_secret_key
+STRIPE_PUBLISHABLE_KEY=pk_live_your_stripe_publishable_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+
+# For development
+STRIPE_SECRET_KEY=sk_test_your_test_secret_key
+STRIPE_PUBLISHABLE_KEY=pk_test_your_test_publishable_key
+```
+
+### Stripe Client Configuration
+
+```typescript
+// src/payment/stripe/client.ts
+import Stripe from 'stripe'
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2023-10-16',
+  typescript: true,
+})
+
+// Client-side Stripe
+export const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+```
+
+### Payment Configuration
+
+```typescript
+// src/config/payment.config.ts
+export const PAYMENT_CONFIG = {
+  currency: 'usd',
+  plans: {
+    basic: {
+      id: 'basic',
+      name: 'Basic Plan',
+      price: 9.99,
+      interval: 'month',
+      features: [
+        'Up to 5 projects',
+        '10GB storage',
+        'Email support',
+        'Basic analytics',
+      ],
+      stripePriceId: 'price_basic_monthly',
+    },
+    pro: {
+      id: 'pro',
+      name: 'Pro Plan',
+      price: 29.99,
+      interval: 'month',
+      features: [
+        'Unlimited projects',
+        '100GB storage',
+        'Priority support',
+        'Advanced analytics',
+        'Team collaboration',
+      ],
+      stripePriceId: 'price_pro_monthly',
+    },
+    enterprise: {
+      id: 'enterprise',
+      name: 'Enterprise Plan',
+      price: 99.99,
+      interval: 'month',
+      features: [
+        'Everything in Pro',
+        '1TB storage',
+        'Dedicated support',
+        'Custom integrations',
+        'SLA guarantee',
+      ],
+      stripePriceId: 'price_enterprise_monthly',
+    },
+  },
+} as const
+
+export type PlanId = keyof typeof PAYMENT_CONFIG.plans
+export type Plan = typeof PAYMENT_CONFIG.plans[PlanId]
+```
+
+## Database Schema
+
+### Subscription Schema
+
+```typescript
+// src/server/db/schema.ts
+export const subscriptions = pgTable("subscriptions", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  stripeSubscriptionId: text("stripeSubscriptionId").unique(),
+  stripeCustomerId: text("stripeCustomerId"),
+  stripePriceId: text("stripePriceId"),
+  status: text("status").notNull(), // active, canceled, past_due, etc.
+  planId: text("planId").notNull(),
+  currentPeriodStart: timestamp("currentPeriodStart", { mode: "date" }),
+  currentPeriodEnd: timestamp("currentPeriodEnd", { mode: "date" }),
+  cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").default(false),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const invoices = pgTable("invoices", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  subscriptionId: text("subscriptionId")
+    .references(() => subscriptions.id, { onDelete: "cascade" }),
+  stripeInvoiceId: text("stripeInvoiceId").unique(),
+  amount: integer("amount").notNull(), // in cents
+  currency: text("currency").default("usd").notNull(),
+  status: text("status").notNull(), // paid, open, void, etc.
+  hostedInvoiceUrl: text("hostedInvoiceUrl"),
+  invoicePdf: text("invoicePdf"),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const paymentMethods = pgTable("paymentMethods", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  stripePaymentMethodId: text("stripePaymentMethodId").unique().notNull(),
+  type: text("type").notNull(), // card, bank_account, etc.
+  brand: text("brand"), // visa, mastercard, etc.
+  last4: text("last4"),
+  expiryMonth: integer("expiryMonth"),
+  expiryYear: integer("expiryYear"),
+  isDefault: boolean("isDefault").default(false),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+})
+```
+
+## Subscription Management
+
+### Create Subscription
+
+```typescript
+// src/server/actions/payment/create-subscription.ts
+"use server"
+
+import { stripe } from "@/payment/stripe/client"
+import { db } from "@/server/db"
+import { subscriptions } from "@/server/db/schema"
+import { auth } from "@/lib/auth/auth"
+import { headers } from "next/headers"
+import { PAYMENT_CONFIG } from "@/config/payment.config"
+
+export async function createSubscription(planId: string) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session?.user) {
+    throw new Error("Unauthorized")
+  }
+
+  const plan = PAYMENT_CONFIG.plans[planId as keyof typeof PAYMENT_CONFIG.plans]
+  if (!plan) {
+    throw new Error("Invalid plan")
+  }
+
+  try {
+    // Create or retrieve Stripe customer
+    let customer = await stripe.customers.search({
+      query: `email:'${session.user.email}'`,
+    })
+
+    if (customer.data.length === 0) {
+      customer.data[0] = await stripe.customers.create({
+        email: session.user.email,
+        name: session.user.name,
+        metadata: {
+          userId: session.user.id,
+        },
+      })
+    }
+
+    // Create subscription
+    const subscription = await stripe.subscriptions.create({
+      customer: customer.data[0].id,
+      items: [
+        {
+          price: plan.stripePriceId,
+        },
+      ],
+      payment_behavior: 'default_incomplete',
+      payment_settings: {
+        save_default_payment_method: 'on_subscription',
+      },
+      expand: ['latest_invoice.payment_intent'],
+    })
+
+    // Save subscription to database
+    await db.insert(subscriptions).values({
+      id: crypto.randomUUID(),
+      userId: session.user.id,
+      stripeSubscriptionId: subscription.id,
+      stripeCustomerId: customer.data[0].id,
+      stripePriceId: plan.stripePriceId,
+      status: subscription.status,
+      planId: planId,
+      currentPeriodStart: new Date(subscription.current_period_start * 1000),
+      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+    })
+
+    return {
+      subscriptionId: subscription.id,
+      clientSecret: (subscription.latest_invoice as any)?.payment_intent?.client_secret,
+    }
+  } catch (error) {
+    console.error('Error creating subscription:', error)
+    throw new Error('Failed to create subscription')
+  }
+}
+```
+
+### Cancel Subscription
+
+```typescript
+// src/server/actions/payment/cancel-subscription.ts
+"use server"
+
+import { stripe } from "@/payment/stripe/client"
+import { db } from "@/server/db"
+import { subscriptions } from "@/server/db/schema"
+import { auth } from "@/lib/auth/auth"
+import { headers } from "next/headers"
+import { eq } from "drizzle-orm"
+
+export async function cancelSubscription(subscriptionId: string, immediate = false) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session?.user) {
+    throw new Error("Unauthorized")
+  }
+
+  try {
+    // Get subscription from database
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, session.user.id))
+      .where(eq(subscriptions.stripeSubscriptionId, subscriptionId))
+
+    if (!subscription) {
+      throw new Error("Subscription not found")
+    }
+
+    if (immediate) {
+      // Cancel immediately
+      await stripe.subscriptions.cancel(subscriptionId)
+      
+      // Update database
+      await db
+        .update(subscriptions)
+        .set({
+          status: 'canceled',
+          cancelAtPeriodEnd: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptions.stripeSubscriptionId, subscriptionId))
+    } else {
+      // Cancel at period end
+      await stripe.subscriptions.update(subscriptionId, {
+        cancel_at_period_end: true,
+      })
+
+      // Update database
+      await db
+        .update(subscriptions)
+        .set({
+          cancelAtPeriodEnd: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptions.stripeSubscriptionId, subscriptionId))
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error canceling subscription:', error)
+    throw new Error('Failed to cancel subscription')
+  }
+}
+```
+
+## Webhooks
+
+Stripe webhooks are essential for handling asynchronous events like successful payments and subscription changes.
+
+### Development
+
+For local development, you can use the Stripe CLI to forward events to your local server:
+
+```bash
+pnpm install -g stripe/stripe-cli
+```
+
+Login to Stripe:
+
+```bash
+stripe login
+```
+
+Forward events to your local server:
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+The webhook secret is printed in the terminal. Copy it and add it to your `.env` file:
+
+```
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+You can trigger test events using the Stripe CLI, or test events on the website:
+
+```bash
+stripe trigger checkout.session.completed
+stripe trigger customer.subscription.created
+stripe trigger customer.subscription.updated
+stripe trigger customer.subscription.deleted
+```
+
+### Production
+
+1. Go to the Stripe Dashboard > Developers > Webhooks
+2. Click "Add endpoint"
+3. Enter your webhook URL: `https://your-domain.com/api/webhooks/stripe`
+4. Select the events to listen for:
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+5. After creating, click "Reveal" to view your Webhook Signing Secret
+6. Copy the webhook secret (starts with `whsec_`) and add it to your environment variables
+
+### Webhook Route
+
+```typescript
+// src/app/api/webhooks/stripe/route.ts
+import { stripe } from "@/payment/stripe/client"
+import { db } from "@/server/db"
+import { subscriptions, invoices } from "@/server/db/schema"
+import { eq } from "drizzle-orm"
+import { headers } from "next/headers"
+import { NextRequest, NextResponse } from "next/server"
+
+export async function POST(req: NextRequest) {
+  const body = await req.text()
+  const signature = headers().get("stripe-signature")!
+
+  let event: any
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    )
+  } catch (error) {
+    console.error('Webhook signature verification failed:', error)
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+  }
+
+  try {
+    switch (event.type) {
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+        await handleSubscriptionUpdate(event.data.object)
+        break
+
+      case 'customer.subscription.deleted':
+        await handleSubscriptionDeleted(event.data.object)
+        break
+
+      case 'invoice.payment_succeeded':
+        await handleInvoicePaymentSucceeded(event.data.object)
+        break
+
+      case 'invoice.payment_failed':
+        await handleInvoicePaymentFailed(event.data.object)
+        break
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`)
+    }
+
+    return NextResponse.json({ received: true })
+  } catch (error) {
+    console.error('Webhook handler error:', error)
+    return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 })
+  }
+}
+
+async function handleSubscriptionUpdate(subscription: any) {
+  await db
+    .update(subscriptions)
+    .set({
+      status: subscription.status,
+      currentPeriodStart: new Date(subscription.current_period_start * 1000),
+      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.stripeSubscriptionId, subscription.id))
+}
+
+async function handleSubscriptionDeleted(subscription: any) {
+  await db
+    .update(subscriptions)
+    .set({
+      status: 'canceled',
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.stripeSubscriptionId, subscription.id))
+}
+
+async function handleInvoicePaymentSucceeded(invoice: any) {
+  // Update or create invoice record
+  await db
+    .insert(invoices)
+    .values({
+      id: crypto.randomUUID(),
+      userId: invoice.customer, // This should be mapped to your user ID
+      stripeInvoiceId: invoice.id,
+      amount: invoice.amount_paid,
+      currency: invoice.currency,
+      status: 'paid',
+      hostedInvoiceUrl: invoice.hosted_invoice_url,
+      invoicePdf: invoice.invoice_pdf,
+    })
+    .onConflictDoUpdate({
+      target: invoices.stripeInvoiceId,
+      set: {
+        status: 'paid',
+        hostedInvoiceUrl: invoice.hosted_invoice_url,
+        invoicePdf: invoice.invoice_pdf,
+      },
+    })
+}
+
+async function handleInvoicePaymentFailed(invoice: any) {
+  // Handle failed payment - send notification, update status, etc.
+  console.log('Payment failed for invoice:', invoice.id)
+}
+```
+
+## Payment Components
+
+### Subscription Card
+
+```tsx
+// src/components/payment/subscription-card.tsx
+"use client"
+
+import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Check, X } from "lucide-react"
+import { createSubscription } from "@/server/actions/payment/create-subscription"
+import { PAYMENT_CONFIG, type PlanId } from "@/config/payment.config"
+
+interface SubscriptionCardProps {
+  planId: PlanId
+  currentPlan?: string
+  isLoading?: boolean
+  onSubscribe?: (planId: string) => void
+}
+
+export function SubscriptionCard({ 
+  planId, 
+  currentPlan, 
+  isLoading, 
+  onSubscribe 
+}: SubscriptionCardProps) {
+  const [subscribing, setSubscribing] = useState(false)
+  const plan = PAYMENT_CONFIG.plans[planId]
+  const isCurrentPlan = currentPlan === planId
+
+  const handleSubscribe = async () => {
+    if (isCurrentPlan) return
+
+    setSubscribing(true)
+    try {
+      await createSubscription(planId)
+      onSubscribe?.(planId)
+    } catch (error) {
+      console.error('Subscription failed:', error)
+    } finally {
+      setSubscribing(false)
+    }
+  }
+
+  return (
+    <Card className={`relative ${isCurrentPlan ? 'border-primary' : ''}`}>
+      {isCurrentPlan && (
+        <Badge className="absolute -top-2 left-1/2 -translate-x-1/2">
+          Current Plan
+        </Badge>
+      )}
+      
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl">{plan.name}</CardTitle>
+        <CardDescription>
+          <span className="text-4xl font-bold">${plan.price}</span>
+          <span className="text-muted-foreground">/{plan.interval}</span>
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-6">
+        <ul className="space-y-3">
+          {plan.features.map((feature, index) => (
+            <li key={index} className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-green-500" />
+              <span className="text-sm">{feature}</span>
+            </li>
+          ))}
+        </ul>
+
+        <Button
+          className="w-full"
+          onClick={handleSubscribe}
+          disabled={isCurrentPlan || subscribing || isLoading}
+        >
+          {isCurrentPlan 
+            ? "Current Plan" 
+            : subscribing 
+            ? "Subscribing..." 
+            : `Subscribe to ${plan.name}`
+          }
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### Billing Dashboard
+
+```tsx
+// src/components/billing/billing-page.tsx
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Calendar, CreditCard, Download, ExternalLink } from "lucide-react"
+import { getBillingInfo } from "@/server/actions/payment/get-billing-info"
+import { cancelSubscription } from "@/server/actions/payment/cancel-subscription"
+
+interface BillingInfo {
+  subscription: {
+    id: string
+    planId: string
+    status: string
+    currentPeriodStart: Date
+    currentPeriodEnd: Date
+    cancelAtPeriodEnd: boolean
+  }
+  invoices: Array<{
+    id: string
+    amount: number
+    currency: string
+    status: string
+    hostedInvoiceUrl: string
+    createdAt: Date
+  }>
+  paymentMethods: Array<{
+    id: string
+    type: string
+    brand: string
+    last4: string
+    expiryMonth: number
+    expiryYear: number
+    isDefault: boolean
+  }>
+}
+
+export function BillingPage() {
+  const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [canceling, setCanceling] = useState(false)
+
+  useEffect(() => {
+    loadBillingInfo()
+  }, [])
+
+  const loadBillingInfo = async () => {
+    try {
+      const info = await getBillingInfo()
+      setBillingInfo(info)
+    } catch (error) {
+      console.error('Failed to load billing info:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancelSubscription = async () => {
+    if (!billingInfo?.subscription) return
+
+    setCanceling(true)
+    try {
+      await cancelSubscription(billingInfo.subscription.id)
+      await loadBillingInfo()
+    } catch (error) {
+      console.error('Failed to cancel subscription:', error)
+    } finally {
+      setCanceling(false)
+    }
+  }
+
+  if (loading) {
+    return <div>Loading billing information...</div>
+  }
+
+  if (!billingInfo) {
+    return <div>No billing information available</div>
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Billing & Subscription</h1>
+        <p className="text-muted-foreground">
+          Manage your subscription and billing information
+        </p>
+      </div>
+
+      {/* Current Subscription */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Current Subscription</CardTitle>
+          <CardDescription>
+            Your current plan and billing cycle
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold">
+                {PAYMENT_CONFIG.plans[billingInfo.subscription.planId]?.name}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                ${PAYMENT_CONFIG.plans[billingInfo.subscription.planId]?.price}/{PAYMENT_CONFIG.plans[billingInfo.subscription.planId]?.interval}
+              </p>
+            </div>
+            <Badge variant={billingInfo.subscription.status === 'active' ? 'default' : 'secondary'}>
+              {billingInfo.subscription.status}
+            </Badge>
+          </div>
+
+          <Separator />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium">Current Period</p>
+              <p className="text-sm text-muted-foreground">
+                {billingInfo.subscription.currentPeriodStart.toLocaleDateString()} - {billingInfo.subscription.currentPeriodEnd.toLocaleDateString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium">Next Billing Date</p>
+              <p className="text-sm text-muted-foreground">
+                {billingInfo.subscription.currentPeriodEnd.toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm">
+              Change Plan
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancelSubscription}
+              disabled={canceling || billingInfo.subscription.cancelAtPeriodEnd}
+            >
+              {billingInfo.subscription.cancelAtPeriodEnd
+                ? "Cancels at Period End"
+                : canceling
+                ? "Canceling..."
+                : "Cancel Subscription"
+              }
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Payment Methods */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Payment Methods</CardTitle>
+          <CardDescription>
+            Manage your payment methods
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {billingInfo.paymentMethods.map((method) => (
+            <div key={method.id} className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <CreditCard className="h-5 w-5" />
+                <div>
+                  <p className="font-medium">
+                    {method.brand.toUpperCase()} •••• {method.last4}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Expires {method.expiryMonth}/{method.expiryYear}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {method.isDefault && (
+                  <Badge variant="secondary">Default</Badge>
+                )}
+                <Button variant="ghost" size="sm">
+                  Edit
+                </Button>
+              </div>
+            </div>
+          ))}
+          <Button variant="outline" size="sm">
+            Add Payment Method
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Billing History */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Billing History</CardTitle>
+          <CardDescription>
+            Your past invoices and payments
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {billingInfo.invoices.map((invoice) => (
+              <div key={invoice.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5" />
+                  <div>
+                    <p className="font-medium">
+                      ${(invoice.amount / 100).toFixed(2)} {invoice.currency.toUpperCase()}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {invoice.createdAt.toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'}>
+                    {invoice.status}
+                  </Badge>
+                  <Button variant="ghost" size="sm" asChild>
+                    <a href={invoice.hostedInvoiceUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+```
+
+## Payment Processing
+
+### Stripe Elements Integration
+
+```tsx
+// src/components/payment/checkout-form.tsx
+"use client"
+
+import { useState } from "react"
+import { loadStripe } from "@stripe/stripe-js"
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+
+function CheckoutForm({ clientSecret }: { clientSecret: string }) {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+
+    if (!stripe || !elements) return
+
+    setLoading(true)
+    setError(null)
+
+    const cardElement = elements.getElement(CardElement)
+
+    if (!cardElement) {
+      setError('Card element not found')
+      setLoading(false)
+      return
+    }
+
+    const { error: confirmError } = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: {
+        card: cardElement,
+      },
+    })
+
+    if (confirmError) {
+      setError(confirmError.message || 'Payment failed')
+    } else {
+      // Payment succeeded
+      window.location.href = '/dashboard?payment=success'
+    }
+
+    setLoading(false)
+  }
+
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>Complete Payment</CardTitle>
+        <CardDescription>
+          Enter your payment details to complete your subscription
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="p-3 border rounded-lg">
+            <CardElement
+              options={{
+                style: {
+                  base: {
+                    fontSize: '16px',
+                    color: '#424770',
+                    '::placeholder': {
+                      color: '#aab7c4',
+                    },
+                  },
+                },
+              }}
+            />
+          </div>
+          
+          {error && (
+            <p className="text-sm text-red-600">{error}</p>
+          )}
+          
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={!stripe || loading}
+          >
+            {loading ? 'Processing...' : 'Complete Payment'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function PaymentCheckout({ clientSecret }: { clientSecret: string }) {
+  return (
+    <Elements stripe={stripePromise}>
+      <CheckoutForm clientSecret={clientSecret} />
+    </Elements>
+  )
+}
+```
+
+## Testing Payments
+
+### Test Card Numbers
+
+```typescript
+// src/lib/test-data.ts
+export const STRIPE_TEST_CARDS = {
+  visa: '4242424242424242',
+  visaDebit: '4000056655665556',
+  mastercard: '5555555555554444',
+  amex: '378282246310005',
+  declined: '4000000000000002',
+  insufficientFunds: '4000000000009995',
+  expired: '4000000000000069',
+  processing: '4000000000000259',
+} as const
+```
+
+### Test Webhook Events
+
+```bash
+# Install Stripe CLI
+stripe login
+
+# Forward webhooks to local development
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+
+# Trigger test events
+stripe trigger customer.subscription.created
+stripe trigger invoice.payment_succeeded
+stripe trigger invoice.payment_failed
+```
+
+## Security Best Practices
+
+### Webhook Security
+
+```typescript
+// Verify webhook signatures
+const signature = headers().get("stripe-signature")!
+
+try {
+  event = stripe.webhooks.constructEvent(
+    body,
+    signature,
+    process.env.STRIPE_WEBHOOK_SECRET!
+  )
+} catch (error) {
+  return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+}
+```
+
+### Environment Variables
+
+```
+# Production
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Development
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Webhook Signature Verification Failed**
+   - Check webhook secret in environment variables
+   - Verify webhook endpoint URL in Stripe dashboard
+   - Ensure raw body is used for signature verification
+
+2. **Payment Failed**
+   - Check test card numbers
+   - Verify Stripe keys are correct
+   - Check browser console for JavaScript errors
+
+3. **Subscription Not Created**
+   - Verify customer exists in Stripe
+   - Check price IDs match Stripe dashboard
+   - Review webhook logs for errors
+

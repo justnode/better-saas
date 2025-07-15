@@ -1,26 +1,424 @@
 ---
 title: Vercel Deployment
+description: Deploy your Better SaaS application to Vercel with one-click deployment
 ---
 
 # Vercel Deployment
 
-## Introduction
+Deploy your Better SaaS application to Vercel with seamless integration and automatic deployments. Vercel provides the best developer experience for Next.js applications with zero configuration.
 
-Vercel is a modern frontend deployment platform optimized for Next.js applications.
+## 🚀 Quick Deployment
 
-## Prerequisites
+### One-Click Deploy
 
-- GitHub account
-- Vercel account
-- Project pushed to GitHub repository
+The fastest way to deploy your Better SaaS application:
 
-## Installation Steps
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/your-username/better-saas)
 
-1. Login to Vercel console
-2. Connect GitHub repository
-3. Configure environment variables
-4. Deploy project
+### Manual Deployment
 
-## Configuration
+1. **Install Vercel CLI**
+   ```bash
+   npm install -g vercel
+   ```
 
-Detailed instructions for configuring environment variables and deployment settings.
+2. **Login to Vercel**
+   ```bash
+   vercel login
+   ```
+
+3. **Deploy from your project directory**
+   ```bash
+   vercel
+   ```
+
+4. **Follow the prompts**
+   - Set up and deploy? **Yes**
+   - Which scope? **Select your account**
+   - Link to existing project? **No**
+   - What's your project's name? **better-saas**
+   - In which directory is your code located? **./src**
+
+## 🔧 Environment Variables
+
+Configure your environment variables in the Vercel dashboard:
+
+### Required Variables
+
+```bash
+# Application Configuration
+NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
+
+# Database
+DATABASE_URL=postgresql://username:password@host:5432/database
+
+# Authentication
+BETTER_AUTH_SECRET=your-production-secret-key
+
+# Admin Configuration
+ADMIN_EMAILS=admin@yourdomain.com
+```
+
+### Optional Variables (for full functionality)
+
+```bash
+# Stripe Payment
+STRIPE_SECRET_KEY=sk_live_your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY=price_monthly_id
+NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY=price_yearly_id
+
+# OAuth Providers
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# File Storage
+R2_BUCKET_NAME=your-production-bucket
+R2_ACCESS_KEY_ID=your-access-key-id
+R2_SECRET_ACCESS_KEY=your-secret-access-key
+R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+R2_PUBLIC_URL=https://your-production-domain.com
+```
+
+### Setting Environment Variables
+
+1. **Via Vercel Dashboard:**
+   - Go to your project settings
+   - Navigate to "Environment Variables"
+   - Add each variable with appropriate environment (Production, Preview, Development)
+
+2. **Via Vercel CLI:**
+   ```bash
+   vercel env add NEXT_PUBLIC_APP_URL
+   vercel env add DATABASE_URL
+   vercel env add BETTER_AUTH_SECRET
+   ```
+
+## 🗄️ Database Setup
+
+### PostgreSQL Database
+
+Choose one of these options for your production database:
+
+#### Option 1: Vercel Postgres (Recommended)
+
+1. **Add Vercel Postgres to your project:**
+   ```bash
+   vercel postgres create
+   ```
+
+2. **Link to your project:**
+   ```bash
+   vercel postgres connect
+   ```
+
+3. **Get connection details:**
+   - The `DATABASE_URL` will be automatically added to your environment variables
+
+#### Option 2: External PostgreSQL
+
+Popular PostgreSQL hosting options:
+- **Supabase** - [supabase.com](https://supabase.com/)
+- **PlanetScale** - [planetscale.com](https://planetscale.com/)
+- **Railway** - [railway.app](https://railway.app/)
+- **Neon** - [neon.tech](https://neon.tech/)
+
+### Database Migration
+
+After setting up your database, run migrations:
+
+```bash
+# Generate migration files
+pnpm db:generate
+
+# Apply migrations to production database
+pnpm db:migrate
+```
+
+## 🔄 Automatic Deployments
+
+### GitHub Integration
+
+1. **Connect your GitHub repository:**
+   - Go to your Vercel dashboard
+   - Click "Import Project"
+   - Select your GitHub repository
+   - Configure build settings
+
+2. **Automatic deployment triggers:**
+   - ✅ **Push to main branch** - Deploys to production
+   - ✅ **Pull requests** - Creates preview deployments
+   - ✅ **Branch deployments** - Deploy specific branches
+
+### Build Configuration
+
+Vercel automatically detects Next.js projects. Default configuration:
+
+```json
+{
+  "buildCommand": "pnpm build",
+  "devCommand": "pnpm dev",
+  "installCommand": "pnpm install",
+  "outputDirectory": ".next"
+}
+```
+
+### Custom Build Settings
+
+Create `vercel.json` in your project root for custom configuration:
+
+```json
+{
+  "framework": "nextjs",
+  "buildCommand": "pnpm build",
+  "devCommand": "pnpm dev",
+  "installCommand": "pnpm install",
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/cleanup",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}
+```
+
+## 🌐 Custom Domain
+
+### Add Custom Domain
+
+1. **In Vercel Dashboard:**
+   - Go to your project settings
+   - Navigate to "Domains"
+   - Add your custom domain
+
+2. **DNS Configuration:**
+   - Add CNAME record pointing to `cname.vercel-dns.com`
+   - Or add A record pointing to Vercel's IP addresses
+
+3. **SSL Certificate:**
+   - Vercel automatically provisions SSL certificates
+   - HTTPS is enabled by default
+
+### Domain Configuration Example
+
+```bash
+# DNS Records
+CNAME   www     cname.vercel-dns.com
+CNAME   @       cname.vercel-dns.com
+
+# Or A Records
+A       @       76.76.19.61
+A       @       76.76.19.62
+```
+
+## 🔐 Security Configuration
+
+### Environment-Specific Settings
+
+```bash
+# Production Environment Variables
+NODE_ENV=production
+NEXT_PUBLIC_APP_URL=https://yourdomain.com
+
+# Security Headers (automatically handled by Vercel)
+# - X-Frame-Options
+# - X-Content-Type-Options
+# - X-XSS-Protection
+# - Strict-Transport-Security
+```
+
+### Webhook Security
+
+For Stripe webhooks, configure the endpoint in your Stripe dashboard:
+
+```
+Webhook URL: https://yourdomain.com/api/webhooks/stripe
+Events: customer.subscription.created, customer.subscription.updated, invoice.payment_succeeded
+```
+
+## 📊 Monitoring & Analytics
+
+### Vercel Analytics
+
+Enable Vercel Analytics for performance monitoring:
+
+1. **Install Vercel Analytics:**
+   ```bash
+   pnpm add @vercel/analytics
+   ```
+
+2. **Add to your layout:**
+   ```tsx
+   import { Analytics } from '@vercel/analytics/react'
+   
+   export default function RootLayout({
+     children,
+   }: {
+     children: React.ReactNode
+   }) {
+     return (
+       <html>
+         <body>
+           {children}
+           <Analytics />
+         </body>
+       </html>
+     )
+   }
+   ```
+
+### Speed Insights
+
+Enable Speed Insights for performance metrics:
+
+```bash
+pnpm add @vercel/speed-insights
+```
+
+```tsx
+import { SpeedInsights } from '@vercel/speed-insights/next'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html>
+      <body>
+        {children}
+        <SpeedInsights />
+      </body>
+    </html>
+  )
+}
+```
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+#### Build Failures
+
+**Issue:** Build fails with dependency errors
+```bash
+# Solution: Clear cache and reinstall
+vercel --force
+```
+
+#### Environment Variables Not Loading
+
+**Issue:** Environment variables are undefined in production
+```bash
+# Check environment variables
+vercel env ls
+
+# Pull environment variables locally
+vercel env pull .env.local
+```
+
+#### Database Connection Issues
+
+**Issue:** Cannot connect to database
+```bash
+# Verify DATABASE_URL format
+postgresql://username:password@host:5432/database
+
+# Test connection locally
+psql $DATABASE_URL
+```
+
+#### Function Timeout
+
+**Issue:** API routes timeout after 10 seconds
+```json
+// vercel.json
+{
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  }
+}
+```
+
+### Performance Optimization
+
+#### Edge Runtime
+
+Use Edge Runtime for faster response times:
+
+```typescript
+// app/api/example/route.ts
+export const runtime = 'edge'
+
+export async function GET() {
+  return Response.json({ message: 'Hello from Edge Runtime!' })
+}
+```
+
+#### Static Generation
+
+Optimize static pages for better performance:
+
+```typescript
+// app/page.tsx
+export const revalidate = 3600 // Revalidate every hour
+
+export default function HomePage() {
+  return <div>Your content</div>
+}
+```
+
+## 🎯 Best Practices
+
+### Deployment Checklist
+
+Before deploying to production:
+
+- [ ] **Environment variables** are configured
+- [ ] **Database** is set up and migrated
+- [ ] **Domain** is configured with SSL
+- [ ] **Webhooks** are configured for external services
+- [ ] **Analytics** and monitoring are enabled
+- [ ] **Error tracking** is configured
+- [ ] **Performance** is optimized
+
+### Security Best Practices
+
+- ✅ Use strong secrets for `BETTER_AUTH_SECRET`
+- ✅ Configure CORS properly for API routes
+- ✅ Use HTTPS for all external webhooks
+- ✅ Regularly rotate API keys and secrets
+- ✅ Monitor for security vulnerabilities
+- ✅ Use environment-specific configurations
+
+### Performance Best Practices
+
+- ✅ Enable Edge Runtime where possible
+- ✅ Use static generation for static content
+- ✅ Optimize images with Next.js Image component
+- ✅ Implement proper caching strategies
+- ✅ Monitor Core Web Vitals
+- ✅ Use Vercel Analytics for insights
+
+## 📚 Next Steps
+
+After successful deployment:
+
+1. **Configure monitoring** - Set up error tracking and performance monitoring
+2. **Set up CI/CD** - Configure automated testing and deployment
+3. **Domain setup** - Configure custom domain and SSL
+4. **Backup strategy** - Implement database backup and recovery
+5. **Scaling** - Monitor performance and scale as needed
+
+---
+
+**Congratulations!** Your Better SaaS application is now live on Vercel. Monitor your application's performance and scale as your user base grows.

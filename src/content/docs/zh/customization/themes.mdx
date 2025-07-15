@@ -1,0 +1,679 @@
+---
+title: 自定义主题
+---
+本指南涵盖了 Better SaaS 中的主题自定义、色彩系统和样式模式。
+
+Better SaaS 使用基于 Tailwind CSS 的综合主题系统，支持明暗模式和自定义配色方案。
+
+### 主题架构
+
+```
+src/
+├── config/
+│   └── theme.config.ts      # 主题配置
+├── components/
+│   └── providers/
+│       └── theme-provider.tsx # 主题提供者
+├── styles/
+│   └── globals.css          # 全局样式和 CSS 变量
+└── components/ui/           # 主题化 UI 组件
+```
+
+## 主题配置
+
+### 核心主题配置
+
+```typescript
+// src/config/theme.config.ts
+import type { ThemeConfig } from "@/types";
+
+export const themeConfig: ThemeConfig = {
+  // 默认主题
+  defaultTheme: 'system',
+  
+  // 可用主题
+  themes: ['light', 'dark', 'system'] as const,
+  
+  // 色彩调色板
+  colors: {
+    primary: {
+      50: '#eff6ff',
+      100: '#dbeafe',
+      200: '#bfdbfe',
+      // ... 完整色彩阶梯
+      900: '#1e3a8a',
+      950: '#172554',
+    },
+    // ... 其他色彩阶梯
+  },
+
+  // 字体系列
+  fonts: {
+    sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
+    mono: ['var(--font-geist-mono)', 'ui-monospace', 'monospace'],
+    serif: ['ui-serif', 'Georgia', 'serif'],
+  },
+
+  // 边框圆角
+  borderRadius: {
+    none: '0',
+    sm: '0.375rem',
+    md: '0.5rem',
+    lg: '0.625rem',
+    xl: '0.75rem',
+    full: '9999px',
+  },
+
+  // 间距比例
+  spacing: {
+    xs: '0.5rem',
+    sm: '0.75rem',
+    md: '1rem',
+    lg: '1.5rem',
+    xl: '2rem',
+    '2xl': '3rem',
+    '3xl': '4rem',
+  },
+
+  // 动画配置
+  animations: {
+    duration: {
+      fast: '150ms',
+      normal: '300ms',
+      slow: '500ms',
+    },
+    easing: {
+      ease: 'ease',
+      easeIn: 'ease-in',
+      easeOut: 'ease-out',
+      easeInOut: 'ease-in-out',
+    },
+  },
+
+  // 响应式断点
+  breakpoints: {
+    sm: '640px',
+    md: '768px',
+    lg: '1024px',
+    xl: '1280px',
+    '2xl': '1536px',
+  },
+
+  // 盒子阴影
+  shadows: {
+    sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+    md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+    lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+    xl: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+    '2xl': '0 25px 50px -12px rgb(0 0 0 / 0.25)',
+  },
+
+  // Z-index 比例
+  zIndex: {
+    dropdown: 1000,
+    modal: 1050,
+    popover: 1060,
+    tooltip: 1070,
+    toast: 1080,
+  },
+};
+```
+
+### 主题提供者设置
+
+```typescript
+// src/components/providers/theme-provider.tsx
+'use client';
+
+import { ThemeProvider as NextThemesProvider } from 'next-themes';
+import type { ReactNode } from 'react';
+import { themeConfig } from '../../config/theme.config';
+
+interface ThemeProviderProps {
+  children: ReactNode;
+  attribute?: 'class' | 'data-theme';
+  defaultTheme?: string;
+  enableSystem?: boolean;
+  disableTransitionOnChange?: boolean;
+}
+
+export function ThemeProvider({
+  children,
+  attribute = 'class',
+  defaultTheme = themeConfig.defaultTheme,
+  enableSystem = true,
+  disableTransitionOnChange = true,
+  ...props
+}: ThemeProviderProps) {
+  return (
+    <NextThemesProvider
+      attribute={attribute}
+      defaultTheme={defaultTheme}
+      enableSystem={enableSystem}
+      disableTransitionOnChange={disableTransitionOnChange}
+      {...props}
+    >
+      {children}
+    </NextThemesProvider>
+  );
+}
+```
+
+## 色彩系统
+
+### CSS 变量
+
+主题系统使用 CSS 变量进行动态颜色切换：
+
+```css
+/* src/styles/globals.css */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  /* ... 更多变量 */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  /* ... 暗色模式覆盖 */
+}
+```
+
+### 自定义色彩阶梯
+
+向主题添加自定义色彩阶梯：
+
+```typescript
+// src/config/theme.config.ts
+export const themeConfig: ThemeConfig = {
+  colors: {
+    // 添加自定义品牌色
+    brand: {
+      50: '#f0f9ff',
+      100: '#e0f2fe',
+      200: '#bae6fd',
+      300: '#7dd3fc',
+      400: '#38bdf8',
+      500: '#0ea5e9',
+      600: '#0284c7',
+      700: '#0369a1',
+      800: '#075985',
+      900: '#0c4a6e',
+      950: '#082f49',
+    },
+    
+    // 自定义语义色彩
+    success: {
+      50: '#f0fdf4',
+      500: '#22c55e',
+      900: '#14532d',
+    },
+    
+    warning: {
+      50: '#fffbeb',
+      500: '#f59e0b',
+      900: '#78350f',
+    },
+    
+    error: {
+      50: '#fef2f2',
+      500: '#ef4444',
+      900: '#7f1d1d',
+    },
+  },
+};
+```
+
+### 在组件中使用色彩
+
+```typescript
+// 在组件中使用主题色彩
+import { cn } from '@/lib/utils';
+
+function CustomButton({ className, ...props }) {
+  return (
+    <button
+      className={cn(
+        'bg-brand-500 text-brand-50 hover:bg-brand-600',
+        'dark:bg-brand-400 dark:text-brand-900',
+        className
+      )}
+      {...props}
+    />
+  );
+}
+```
+
+## 字体系统
+
+### 字体配置
+
+```typescript
+// src/config/theme.config.ts
+export const themeConfig: ThemeConfig = {
+  fonts: {
+    sans: [
+      'var(--font-geist-sans)',
+      'system-ui',
+      '-apple-system',
+      'BlinkMacSystemFont',
+      'Segoe UI',
+      'Roboto',
+      'sans-serif'
+    ],
+    mono: [
+      'var(--font-geist-mono)',
+      'ui-monospace',
+      'SFMono-Regular',
+      'Menlo',
+      'Monaco',
+      'Consolas',
+      'monospace'
+    ],
+    serif: [
+      'ui-serif',
+      'Georgia',
+      'Cambria',
+      'Times New Roman',
+      'Times',
+      'serif'
+    ],
+  },
+};
+```
+
+### 字体加载
+
+```typescript
+// src/app/layout.tsx
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="zh" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="font-sans">
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+### 自定义字体权重
+
+```css
+/* src/styles/globals.css */
+@font-face {
+  font-family: 'Custom Font';
+  src: url('/fonts/custom-font.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 中文字体优化 */
+:lang(zh) {
+  font-family: var(--font-geist-sans), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+}
+```
+
+## 组件样式
+
+### UI 组件变体
+
+```typescript
+// src/components/ui/button.tsx
+import { cva, type VariantProps } from 'class-variance-authority';
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center rounded-md font-medium transition-colors",
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+        outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        link: 'text-primary underline-offset-4 hover:underline',
+      },
+      size: {
+        default: 'h-10 px-4 py-2',
+        sm: 'h-9 rounded-md px-3',
+        lg: 'h-11 rounded-md px-8',
+        icon: 'h-10 w-10',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+);
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+}
+
+export function Button({ className, variant, size, asChild = false, ...props }: ButtonProps) {
+  const Comp = asChild ? Slot : 'button';
+  return (
+    <Comp
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
+  );
+}
+```
+
+### 自定义组件变体
+
+```typescript
+// 添加自定义变体
+const buttonVariants = cva(
+  "inline-flex items-center justify-center rounded-md font-medium transition-colors",
+  {
+    variants: {
+      variant: {
+        // ... 现有变体
+        gradient: 'bg-gradient-to-r from-primary to-secondary text-primary-foreground',
+        glass: 'bg-white/10 backdrop-blur-sm border border-white/20 text-white',
+        neon: 'bg-transparent border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground shadow-[0_0_20px_rgba(59,130,246,0.5)]',
+      },
+      // ... 其余配置
+    },
+  }
+);
+```
+
+## 暗色模式自定义
+
+### 暗色模式样式
+
+```css
+/* src/styles/globals.css */
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+```
+
+### 暗色模式工具
+
+```typescript
+// src/hooks/use-theme.ts
+import { useTheme } from 'next-themes';
+
+export function useThemeUtils() {
+  const { theme, setTheme, systemTheme } = useTheme();
+  
+  const isDark = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
+  
+  const toggleTheme = () => {
+    setTheme(isDark ? 'light' : 'dark');
+  };
+  
+  return {
+    theme,
+    isDark,
+    setTheme,
+    toggleTheme,
+  };
+}
+```
+
+## 动画系统
+
+### 动画配置
+
+```typescript
+// src/config/theme.config.ts
+export const themeConfig: ThemeConfig = {
+  animations: {
+    duration: {
+      fast: '150ms',
+      normal: '300ms',
+      slow: '500ms',
+    },
+    easing: {
+      ease: 'ease',
+      easeIn: 'ease-in',
+      easeOut: 'ease-out',
+      easeInOut: 'ease-in-out',
+    },
+  },
+};
+```
+
+### 自定义动画
+
+```css
+/* src/styles/globals.css */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+```
+
+## 响应式设计
+
+### 断点系统
+
+```typescript
+// src/config/theme.config.ts
+export const themeConfig: ThemeConfig = {
+  breakpoints: {
+    sm: '640px',
+    md: '768px',
+    lg: '1024px',
+    xl: '1280px',
+    '2xl': '1536px',
+  },
+};
+```
+
+### 响应式组件
+
+```typescript
+// 使用响应式工具
+function ResponsiveCard() {
+  return (
+    <div className="w-full sm:w-1/2 md:w-1/3 lg:w-1/4 p-4">
+      <div className="bg-card rounded-lg p-6 shadow-md">
+        <h3 className="text-lg md:text-xl font-semibold mb-2">
+          响应式卡片
+        </h3>
+        <p className="text-sm md:text-base text-muted-foreground">
+          这个卡片会适应不同的屏幕尺寸。
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+## 主题切换
+
+### 主题切换组件
+
+```typescript
+// src/components/theme-toggle.tsx
+'use client';
+
+import { Moon, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+export function ThemeToggle() {
+  const { setTheme } = useTheme();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon">
+          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">切换主题</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme('light')}>
+          浅色
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme('dark')}>
+          深色
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme('system')}>
+          系统
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+```
+
+## 自定义主题创建
+
+### 创建自定义主题
+
+1. **定义色彩调色板**
+
+```typescript
+// src/config/custom-theme.config.ts
+export const customThemeConfig = {
+  colors: {
+    primary: {
+      50: '#fef7ff',
+      100: '#fdeeff',
+      200: '#fcdeff',
+      300: '#f9c7ff',
+      400: '#f4a0ff',
+      500: '#ed70ff',
+      600: '#d946ef',
+      700: '#c026d3',
+      800: '#a21caf',
+      900: '#86198f',
+      950: '#581c87',
+    },
+    // ... 其他色彩
+  },
+};
+```
+
+2. **更新 CSS 变量**
+
+```css
+/* src/styles/custom-theme.css */
+.theme-purple {
+  --primary: oklch(0.67 0.24 310);
+  --primary-foreground: oklch(0.985 0 0);
+  /* ... 其他变量 */
+}
+```
+
+3. **应用自定义主题**
+
+```typescript
+// src/components/theme-provider.tsx
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      themes={['light', 'dark', 'purple']}
+    >
+      {children}
+    </NextThemesProvider>
+  );
+}
+```
+
+## 最佳实践
+
+### 1. 一致的色彩使用
+
+- 使用语义色彩名称（primary、secondary、accent）
+- 保持一致的对比度比例
+- 在明暗模式下测试色彩
+
+### 2. 性能优化
+
+- 使用 CSS 变量进行动态主题切换
+- 在移动设备上减少动画使用
+- 使用 font-display: swap 优化字体加载
+
+### 3. 无障碍性
+
+- 确保充足的色彩对比度
+- 使用屏幕阅读器进行测试
+- 提供主题偏好设置
+
+### 4. 可维护性
+
+- 保持主题配置集中化
+- 使用 TypeScript 进行类型安全
+- 记录自定义色彩阶梯
+
+这个全面的主题系统在保持 Better SaaS 应用程序一致性的同时提供了灵活性。 

@@ -1,0 +1,998 @@
+---
+title: 支付和账单
+---
+
+Better SaaS 包含基于 Stripe 构建的完整支付和账单系统，具有订阅管理、自动化账单、webhook 处理和全面的账单仪表板功能。
+
+## 概述
+
+支付系统提供：
+- **Stripe 集成**: 使用 Stripe 进行安全支付处理
+- **订阅管理**: 灵活的订阅计划和账单周期
+- **Webhook 处理**: 自动化订阅状态更新
+- **账单仪表板**: 完整的账单历史和管理
+- **发票生成**: 自动化发票创建和发送
+- **支付方式**: 支持银行卡、数字钱包等
+- **税费计算**: 自动税费计算和合规
+- **催收管理**: 失败支付的自动重试逻辑
+
+## Stripe 配置
+
+### 环境设置
+
+```
+# Stripe 配置
+STRIPE_SECRET_KEY=sk_live_your_stripe_secret_key
+STRIPE_PUBLISHABLE_KEY=pk_live_your_stripe_publishable_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+
+# 开发环境
+STRIPE_SECRET_KEY=sk_test_your_test_secret_key
+STRIPE_PUBLISHABLE_KEY=pk_test_your_test_publishable_key
+```
+
+### Stripe 客户端配置
+
+```typescript
+// src/payment/stripe/client.ts
+import Stripe from 'stripe'
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2023-10-16',
+  typescript: true,
+})
+
+// 客户端 Stripe
+export const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+```
+
+### 支付配置
+
+```typescript
+// src/config/payment.config.ts
+export const PAYMENT_CONFIG = {
+  currency: 'usd',
+  plans: {
+    basic: {
+      id: 'basic',
+      name: '基础版',
+      price: 9.99,
+      interval: 'month',
+      features: [
+        '最多 5 个项目',
+        '10GB 存储空间',
+        '邮件支持',
+        '基础分析',
+      ],
+      stripePriceId: 'price_basic_monthly',
+    },
+    pro: {
+      id: 'pro',
+      name: '专业版',
+      price: 29.99,
+      interval: 'month',
+      features: [
+        '无限项目',
+        '100GB 存储空间',
+        '优先支持',
+        '高级分析',
+        '团队协作',
+      ],
+      stripePriceId: 'price_pro_monthly',
+    },
+    enterprise: {
+      id: 'enterprise',
+      name: '企业版',
+      price: 99.99,
+      interval: 'month',
+      features: [
+        '专业版所有功能',
+        '1TB 存储空间',
+        '专属支持',
+        '自定义集成',
+        'SLA 保证',
+      ],
+      stripePriceId: 'price_enterprise_monthly',
+    },
+  },
+} as const
+
+export type PlanId = keyof typeof PAYMENT_CONFIG.plans
+export type Plan = typeof PAYMENT_CONFIG.plans[PlanId]
+```
+
+## 数据库架构
+
+### 订阅架构
+
+```typescript
+// src/server/db/schema.ts
+export const subscriptions = pgTable("subscriptions", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  stripeSubscriptionId: text("stripeSubscriptionId").unique(),
+  stripeCustomerId: text("stripeCustomerId"),
+  stripePriceId: text("stripePriceId"),
+  status: text("status").notNull(), // active, canceled, past_due, etc.
+  planId: text("planId").notNull(),
+  currentPeriodStart: timestamp("currentPeriodStart", { mode: "date" }),
+  currentPeriodEnd: timestamp("currentPeriodEnd", { mode: "date" }),
+  cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").default(false),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const invoices = pgTable("invoices", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  subscriptionId: text("subscriptionId")
+    .references(() => subscriptions.id, { onDelete: "cascade" }),
+  stripeInvoiceId: text("stripeInvoiceId").unique(),
+  amount: integer("amount").notNull(), // 以分为单位
+  currency: text("currency").default("usd").notNull(),
+  status: text("status").notNull(), // paid, open, void, etc.
+  hostedInvoiceUrl: text("hostedInvoiceUrl"),
+  invoicePdf: text("invoicePdf"),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const paymentMethods = pgTable("paymentMethods", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  stripePaymentMethodId: text("stripePaymentMethodId").unique().notNull(),
+  type: text("type").notNull(), // card, bank_account, etc.
+  brand: text("brand"), // visa, mastercard, etc.
+  last4: text("last4"),
+  expiryMonth: integer("expiryMonth"),
+  expiryYear: integer("expiryYear"),
+  isDefault: boolean("isDefault").default(false),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+})
+```
+
+## 订阅管理
+
+### 创建订阅
+
+```typescript
+// src/server/actions/payment/create-subscription.ts
+"use server"
+
+import { stripe } from "@/payment/stripe/client"
+import { db } from "@/server/db"
+import { subscriptions } from "@/server/db/schema"
+import { auth } from "@/lib/auth/auth"
+import { headers } from "next/headers"
+import { PAYMENT_CONFIG } from "@/config/payment.config"
+
+export async function createSubscription(planId: string) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session?.user) {
+    throw new Error("未授权")
+  }
+
+  const plan = PAYMENT_CONFIG.plans[planId as keyof typeof PAYMENT_CONFIG.plans]
+  if (!plan) {
+    throw new Error("无效的计划")
+  }
+
+  try {
+    // 创建或获取 Stripe 客户
+    let customer = await stripe.customers.search({
+      query: `email:'${session.user.email}'`,
+    })
+
+    if (customer.data.length === 0) {
+      customer.data[0] = await stripe.customers.create({
+        email: session.user.email,
+        name: session.user.name,
+        metadata: {
+          userId: session.user.id,
+        },
+      })
+    }
+
+    // 创建订阅
+    const subscription = await stripe.subscriptions.create({
+      customer: customer.data[0].id,
+      items: [
+        {
+          price: plan.stripePriceId,
+        },
+      ],
+      payment_behavior: 'default_incomplete',
+      payment_settings: {
+        save_default_payment_method: 'on_subscription',
+      },
+      expand: ['latest_invoice.payment_intent'],
+    })
+
+    // 保存订阅到数据库
+    await db.insert(subscriptions).values({
+      id: crypto.randomUUID(),
+      userId: session.user.id,
+      stripeSubscriptionId: subscription.id,
+      stripeCustomerId: customer.data[0].id,
+      stripePriceId: plan.stripePriceId,
+      status: subscription.status,
+      planId: planId,
+      currentPeriodStart: new Date(subscription.current_period_start * 1000),
+      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+    })
+
+    return {
+      subscriptionId: subscription.id,
+      clientSecret: (subscription.latest_invoice as any)?.payment_intent?.client_secret,
+    }
+  } catch (error) {
+    console.error('创建订阅错误:', error)
+    throw new Error('创建订阅失败')
+  }
+}
+```
+
+### 取消订阅
+
+```typescript
+// src/server/actions/payment/cancel-subscription.ts
+"use server"
+
+import { stripe } from "@/payment/stripe/client"
+import { db } from "@/server/db"
+import { subscriptions } from "@/server/db/schema"
+import { auth } from "@/lib/auth/auth"
+import { headers } from "next/headers"
+import { eq } from "drizzle-orm"
+
+export async function cancelSubscription(subscriptionId: string, immediate = false) {
+  const session = await auth.api.getSession({
+    headers: headers(),
+  })
+
+  if (!session?.user) {
+    throw new Error("未授权")
+  }
+
+  try {
+    // 从数据库获取订阅
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, session.user.id))
+      .where(eq(subscriptions.stripeSubscriptionId, subscriptionId))
+
+    if (!subscription) {
+      throw new Error("订阅未找到")
+    }
+
+    if (immediate) {
+      // 立即取消
+      await stripe.subscriptions.cancel(subscriptionId)
+      
+      // 更新数据库
+      await db
+        .update(subscriptions)
+        .set({
+          status: 'canceled',
+          cancelAtPeriodEnd: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptions.stripeSubscriptionId, subscriptionId))
+    } else {
+      // 在周期结束时取消
+      await stripe.subscriptions.update(subscriptionId, {
+        cancel_at_period_end: true,
+      })
+
+      // 更新数据库
+      await db
+        .update(subscriptions)
+        .set({
+          cancelAtPeriodEnd: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptions.stripeSubscriptionId, subscriptionId))
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('取消订阅错误:', error)
+    throw new Error('取消订阅失败')
+  }
+}
+```
+
+## Webhooks
+
+Stripe webhooks 对于处理异步事件（如成功支付和订阅变更）至关重要。
+
+### 开发环境
+
+对于本地开发，您可以使用 Stripe CLI 将事件转发到本地服务器：
+
+```bash
+pnpm install -g stripe/stripe-cli
+```
+
+登录到 Stripe：
+
+```bash
+stripe login
+```
+
+将事件转发到本地服务器：
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+webhook 密钥会在终端中打印出来。复制它并将其添加到您的 `.env` 文件中：
+
+```
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+您可以使用 Stripe CLI 触发测试事件，或在网站上测试事件：
+
+```bash
+stripe trigger checkout.session.completed
+stripe trigger customer.subscription.created
+stripe trigger customer.subscription.updated
+stripe trigger customer.subscription.deleted
+```
+
+### 生产环境
+
+1. 转到 Stripe 仪表板 > 开发者 > Webhooks
+2. 点击"添加端点"
+3. 输入您的 webhook URL：`https://your-domain.com/api/webhooks/stripe`
+4. 选择要监听的事件：
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+5. 创建后，点击"显示"查看您的 Webhook 签名密钥
+6. 复制 webhook 密钥（以 `whsec_` 开头）并将其添加到您的环境变量中
+
+### Webhook 路由
+
+```typescript
+// src/app/api/webhooks/stripe/route.ts
+import { stripe } from "@/payment/stripe/client"
+import { db } from "@/server/db"
+import { subscriptions, invoices } from "@/server/db/schema"
+import { eq } from "drizzle-orm"
+import { headers } from "next/headers"
+import { NextRequest, NextResponse } from "next/server"
+
+export async function POST(req: NextRequest) {
+  const body = await req.text()
+  const signature = headers().get("stripe-signature")!
+
+  let event: any
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    )
+  } catch (error) {
+    console.error('Webhook 签名验证失败:', error)
+    return NextResponse.json({ error: '无效签名' }, { status: 400 })
+  }
+
+  try {
+    switch (event.type) {
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+        await handleSubscriptionUpdate(event.data.object)
+        break
+
+      case 'customer.subscription.deleted':
+        await handleSubscriptionDeleted(event.data.object)
+        break
+
+      case 'invoice.payment_succeeded':
+        await handleInvoicePaymentSucceeded(event.data.object)
+        break
+
+      case 'invoice.payment_failed':
+        await handleInvoicePaymentFailed(event.data.object)
+        break
+
+      default:
+        console.log(`未处理的事件类型: ${event.type}`)
+    }
+
+    return NextResponse.json({ received: true })
+  } catch (error) {
+    console.error('Webhook 处理器错误:', error)
+    return NextResponse.json({ error: 'Webhook 处理器失败' }, { status: 500 })
+  }
+}
+
+async function handleSubscriptionUpdate(subscription: any) {
+  await db
+    .update(subscriptions)
+    .set({
+      status: subscription.status,
+      currentPeriodStart: new Date(subscription.current_period_start * 1000),
+      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.stripeSubscriptionId, subscription.id))
+}
+
+async function handleSubscriptionDeleted(subscription: any) {
+  await db
+    .update(subscriptions)
+    .set({
+      status: 'canceled',
+      updatedAt: new Date(),
+    })
+    .where(eq(subscriptions.stripeSubscriptionId, subscription.id))
+}
+
+async function handleInvoicePaymentSucceeded(invoice: any) {
+  // 更新或创建发票记录
+  await db
+    .insert(invoices)
+    .values({
+      id: crypto.randomUUID(),
+      userId: invoice.customer, // 这应该映射到您的用户 ID
+      stripeInvoiceId: invoice.id,
+      amount: invoice.amount_paid,
+      currency: invoice.currency,
+      status: 'paid',
+      hostedInvoiceUrl: invoice.hosted_invoice_url,
+      invoicePdf: invoice.invoice_pdf,
+    })
+    .onConflictDoUpdate({
+      target: invoices.stripeInvoiceId,
+      set: {
+        status: 'paid',
+        hostedInvoiceUrl: invoice.hosted_invoice_url,
+        invoicePdf: invoice.invoice_pdf,
+      },
+    })
+}
+
+async function handleInvoicePaymentFailed(invoice: any) {
+  // 处理支付失败 - 发送通知、更新状态等
+  console.log('发票支付失败:', invoice.id)
+}
+```
+
+## 支付组件
+
+### 订阅卡片
+
+```tsx
+// src/components/payment/subscription-card.tsx
+"use client"
+
+import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Check, X } from "lucide-react"
+import { createSubscription } from "@/server/actions/payment/create-subscription"
+import { PAYMENT_CONFIG, type PlanId } from "@/config/payment.config"
+
+interface SubscriptionCardProps {
+  planId: PlanId
+  currentPlan?: string
+  isLoading?: boolean
+  onSubscribe?: (planId: string) => void
+}
+
+export function SubscriptionCard({ 
+  planId, 
+  currentPlan, 
+  isLoading, 
+  onSubscribe 
+}: SubscriptionCardProps) {
+  const [subscribing, setSubscribing] = useState(false)
+  const plan = PAYMENT_CONFIG.plans[planId]
+  const isCurrentPlan = currentPlan === planId
+
+  const handleSubscribe = async () => {
+    if (isCurrentPlan) return
+
+    setSubscribing(true)
+    try {
+      await createSubscription(planId)
+      onSubscribe?.(planId)
+    } catch (error) {
+      console.error('订阅失败:', error)
+    } finally {
+      setSubscribing(false)
+    }
+  }
+
+  return (
+    <Card className={`relative ${isCurrentPlan ? 'border-primary' : ''}`}>
+      {isCurrentPlan && (
+        <Badge className="absolute -top-2 left-1/2 -translate-x-1/2">
+          当前计划
+        </Badge>
+      )}
+      
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl">{plan.name}</CardTitle>
+        <CardDescription>
+          <span className="text-4xl font-bold">¥{plan.price}</span>
+          <span className="text-muted-foreground">/{plan.interval === 'month' ? '月' : '年'}</span>
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-6">
+        <ul className="space-y-3">
+          {plan.features.map((feature, index) => (
+            <li key={index} className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-green-500" />
+              <span className="text-sm">{feature}</span>
+            </li>
+          ))}
+        </ul>
+
+        <Button
+          className="w-full"
+          onClick={handleSubscribe}
+          disabled={isCurrentPlan || subscribing || isLoading}
+        >
+          {isCurrentPlan 
+            ? "当前计划" 
+            : subscribing 
+            ? "订阅中..." 
+            : `订阅${plan.name}`
+          }
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### 账单仪表板
+
+```tsx
+// src/components/billing/billing-page.tsx
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Calendar, CreditCard, Download, ExternalLink } from "lucide-react"
+import { getBillingInfo } from "@/server/actions/payment/get-billing-info"
+import { cancelSubscription } from "@/server/actions/payment/cancel-subscription"
+
+interface BillingInfo {
+  subscription: {
+    id: string
+    planId: string
+    status: string
+    currentPeriodStart: Date
+    currentPeriodEnd: Date
+    cancelAtPeriodEnd: boolean
+  }
+  invoices: Array<{
+    id: string
+    amount: number
+    currency: string
+    status: string
+    hostedInvoiceUrl: string
+    createdAt: Date
+  }>
+  paymentMethods: Array<{
+    id: string
+    type: string
+    brand: string
+    last4: string
+    expiryMonth: number
+    expiryYear: number
+    isDefault: boolean
+  }>
+}
+
+export function BillingPage() {
+  const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [canceling, setCanceling] = useState(false)
+
+  useEffect(() => {
+    loadBillingInfo()
+  }, [])
+
+  const loadBillingInfo = async () => {
+    try {
+      const info = await getBillingInfo()
+      setBillingInfo(info)
+    } catch (error) {
+      console.error('加载账单信息失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancelSubscription = async () => {
+    if (!billingInfo?.subscription) return
+
+    setCanceling(true)
+    try {
+      await cancelSubscription(billingInfo.subscription.id)
+      await loadBillingInfo()
+    } catch (error) {
+      console.error('取消订阅失败:', error)
+    } finally {
+      setCanceling(false)
+    }
+  }
+
+  if (loading) {
+    return <div>加载账单信息中...</div>
+  }
+
+  if (!billingInfo) {
+    return <div>无可用账单信息</div>
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">账单和订阅</h1>
+        <p className="text-muted-foreground">
+          管理您的订阅和账单信息
+        </p>
+      </div>
+
+      {/* 当前订阅 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>当前订阅</CardTitle>
+          <CardDescription>
+            您当前的计划和账单周期
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold">
+                {PAYMENT_CONFIG.plans[billingInfo.subscription.planId]?.name}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                ¥{PAYMENT_CONFIG.plans[billingInfo.subscription.planId]?.price}/{PAYMENT_CONFIG.plans[billingInfo.subscription.planId]?.interval === 'month' ? '月' : '年'}
+              </p>
+            </div>
+            <Badge variant={billingInfo.subscription.status === 'active' ? 'default' : 'secondary'}>
+              {billingInfo.subscription.status === 'active' ? '激活' : billingInfo.subscription.status}
+            </Badge>
+          </div>
+
+          <Separator />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium">当前周期</p>
+              <p className="text-sm text-muted-foreground">
+                {billingInfo.subscription.currentPeriodStart.toLocaleDateString()} - {billingInfo.subscription.currentPeriodEnd.toLocaleDateString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium">下次账单日期</p>
+              <p className="text-sm text-muted-foreground">
+                {billingInfo.subscription.currentPeriodEnd.toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm">
+              更改计划
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancelSubscription}
+              disabled={canceling || billingInfo.subscription.cancelAtPeriodEnd}
+            >
+              {billingInfo.subscription.cancelAtPeriodEnd
+                ? "周期结束时取消"
+                : canceling
+                ? "取消中..."
+                : "取消订阅"
+              }
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 支付方式 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>支付方式</CardTitle>
+          <CardDescription>
+            管理您的支付方式
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {billingInfo.paymentMethods.map((method) => (
+            <div key={method.id} className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <CreditCard className="h-5 w-5" />
+                <div>
+                  <p className="font-medium">
+                    {method.brand.toUpperCase()} •••• {method.last4}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    过期时间 {method.expiryMonth}/{method.expiryYear}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {method.isDefault && (
+                  <Badge variant="secondary">默认</Badge>
+                )}
+                <Button variant="ghost" size="sm">
+                  编辑
+                </Button>
+              </div>
+            </div>
+          ))}
+          <Button variant="outline" size="sm">
+            添加支付方式
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* 账单历史 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>账单历史</CardTitle>
+          <CardDescription>
+            您的历史发票和支付记录
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {billingInfo.invoices.map((invoice) => (
+              <div key={invoice.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5" />
+                  <div>
+                    <p className="font-medium">
+                      ¥{(invoice.amount / 100).toFixed(2)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {invoice.createdAt.toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'}>
+                    {invoice.status === 'paid' ? '已支付' : invoice.status}
+                  </Badge>
+                  <Button variant="ghost" size="sm" asChild>
+                    <a href={invoice.hostedInvoiceUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+```
+
+## 支付处理
+
+### Stripe Elements 集成
+
+```tsx
+// src/components/payment/checkout-form.tsx
+"use client"
+
+import { useState } from "react"
+import { loadStripe } from "@stripe/stripe-js"
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+
+function CheckoutForm({ clientSecret }: { clientSecret: string }) {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+
+    if (!stripe || !elements) return
+
+    setLoading(true)
+    setError(null)
+
+    const cardElement = elements.getElement(CardElement)
+
+    if (!cardElement) {
+      setError('未找到卡片元素')
+      setLoading(false)
+      return
+    }
+
+    const { error: confirmError } = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: {
+        card: cardElement,
+      },
+    })
+
+    if (confirmError) {
+      setError(confirmError.message || '支付失败')
+    } else {
+      // 支付成功
+      window.location.href = '/dashboard?payment=success'
+    }
+
+    setLoading(false)
+  }
+
+  return (
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>完成支付</CardTitle>
+        <CardDescription>
+          输入您的支付详情以完成订阅
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="p-3 border rounded-lg">
+            <CardElement
+              options={{
+                style: {
+                  base: {
+                    fontSize: '16px',
+                    color: '#424770',
+                    '::placeholder': {
+                      color: '#aab7c4',
+                    },
+                  },
+                },
+              }}
+            />
+          </div>
+          
+          {error && (
+            <p className="text-sm text-red-600">{error}</p>
+          )}
+          
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={!stripe || loading}
+          >
+            {loading ? '处理中...' : '完成支付'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function PaymentCheckout({ clientSecret }: { clientSecret: string }) {
+  return (
+    <Elements stripe={stripePromise}>
+      <CheckoutForm clientSecret={clientSecret} />
+    </Elements>
+  )
+}
+```
+
+## 测试支付
+
+### 测试卡号
+
+```typescript
+// src/lib/test-data.ts
+export const STRIPE_TEST_CARDS = {
+  visa: '4242424242424242',
+  visaDebit: '4000056655665556',
+  mastercard: '5555555555554444',
+  amex: '378282246310005',
+  declined: '4000000000000002',
+  insufficientFunds: '4000000000009995',
+  expired: '4000000000000069',
+  processing: '4000000000000259',
+} as const
+```
+
+### 测试 Webhook 事件
+
+```bash
+# 安装 Stripe CLI
+stripe login
+
+# 将 webhook 转发到本地开发
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+
+# 触发测试事件
+stripe trigger customer.subscription.created
+stripe trigger invoice.payment_succeeded
+stripe trigger invoice.payment_failed
+```
+
+## 安全最佳实践
+
+### Webhook 安全
+
+```typescript
+// 验证 webhook 签名
+const signature = headers().get("stripe-signature")!
+
+try {
+  event = stripe.webhooks.constructEvent(
+    body,
+    signature,
+    process.env.STRIPE_WEBHOOK_SECRET!
+  )
+} catch (error) {
+  return NextResponse.json({ error: '无效签名' }, { status: 400 })
+}
+```
+
+### 环境变量
+
+```
+# 生产环境
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# 开发环境
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+## 故障排除
+
+### 常见问题
+
+1. **Webhook 签名验证失败**
+   - 检查环境变量中的 webhook 密钥
+   - 验证 Stripe 仪表板中的 webhook 端点 URL
+   - 确保使用原始 body 进行签名验证
+
+2. **支付失败**
+   - 检查测试卡号
+   - 验证 Stripe 密钥是否正确
+   - 检查浏览器控制台的 JavaScript 错误
+
+3. **订阅未创建**
+   - 验证 Stripe 中客户是否存在
+   - 检查价格 ID 是否与 Stripe 仪表板匹配
+   - 查看 webhook 日志中的错误

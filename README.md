@@ -1,5 +1,7 @@
 # Better SaaS
 
+[中文版 README](README_zh.md) | English
+
 A modern, full-stack SaaS application built with Next.js 15, featuring authentication, payments, file management, and internationalization with comprehensive testing suite.
 
 ## 🚀 Features
@@ -46,59 +48,15 @@ A modern, full-stack SaaS application built with Next.js 15, featuring authentic
 - **E2E Testing**: Playwright with multi-browser support
 - **Test Coverage**: Comprehensive coverage reporting
 
-## 📁 Project Structure
+## 📖 Documentation
 
-```
-src/
-├── app/                    # Next.js App Router
-│   ├── [locale]/          # Internationalized routes
-│   │   ├── (home)/        # Public pages (home, blog, blocks)
-│   │   ├── (protected)/   # Protected dashboard pages
-│   │   ├── docs/          # Documentation
-│   │   ├── login/         # Authentication pages
-│   │   └── signup/        # Registration pages
-│   └── api/               # API routes
-│       ├── auth/          # Authentication endpoints
-│       └── webhooks/      # Webhook handlers (Stripe)
-├── components/            # Reusable UI components
-│   ├── auth/              # Authentication components
-│   ├── blocks/            # Page sections (hero, features, pricing)
-│   ├── dashboard/         # Dashboard components
-│   ├── file-manager/      # File management components
-│   ├── payment/           # Payment and billing components
-│   ├── settings/          # User settings components
-│   └── ui/                # Base UI components (Radix UI)
-├── lib/                   # Utility libraries
-│   ├── auth/              # Authentication config (Better Auth)
-│   ├── fumadocs/          # Documentation generation
-│   ├── logger/            # Logging utilities
-│   └── utils.ts           # Helper functions
-├── server/                # Server-side code
-│   ├── actions/           # Server actions
-│   │   ├── auth-actions.ts
-│   │   ├── file-actions.ts
-│   │   └── payment/       # Payment-related actions
-│   └── db/                # Database layer
-│       ├── repositories/  # Data access layer
-│       ├── services/      # Business logic
-│       └── schema.ts      # Database schema
-├── config/                # Configuration files
-│   ├── app.config.ts      # App configuration
-│   ├── features.config.ts # Feature flags
-│   ├── i18n.config.ts     # Internationalization
-│   └── payment.config.ts  # Payment configuration
-├── content/               # Content management
-│   ├── blog/              # Blog posts (MDX)
-│   └── docs/              # Documentation (MDX)
-├── i18n/                  # Internationalization
-│   ├── messages/          # Translation files
-│   └── navigation.ts      # Localized routing
-├── hooks/                 # Custom React hooks
-├── payment/               # Payment integration
-│   └── stripe/            # Stripe client and provider
-├── store/                 # State management (Zustand)
-└── types/                 # TypeScript definitions
-```
+Built-in documentation is available at `/docs` and includes:
+
+- Architecture overview
+- Installation guide
+- API documentation
+- Component library
+- Testing guide
 
 ## 🚀 Quick Start
 
@@ -158,85 +116,7 @@ src/
    Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 
-## 📋 Available Scripts
 
-### Development
-
-- `pnpm dev` - Start development server with Turbo mode
-- `pnpm build` - Build for production
-- `pnpm start` - Start production server
-- `pnpm preview` - Build and start production server
-
-### Code Quality
-
-- `pnpm check` - Run Biome checks
-- `pnpm check:write` - Fix Biome issues
-- `pnpm check:unsafe` - Fix Biome issues with unsafe fixes
-- `pnpm typecheck` - Run TypeScript checks
-
-### Database
-
-- `pnpm db:generate` - Generate database migrations
-- `pnpm db:migrate` - Run database migrations
-- `pnpm db:push` - Push schema changes to database
-- `pnpm db:studio` - Open Drizzle Studio
-
-### Testing
-
-- `pnpm test` - Run all Jest tests
-- `pnpm test:unit` - Run unit tests only
-- `pnpm test:integration` - Run integration tests only
-- `pnpm test:coverage` - Run tests with coverage report
-- `pnpm test:e2e` - Run Playwright E2E tests
-- `pnpm test:e2e:ui` - Run E2E tests with UI mode
-- `pnpm test:e2e:headed` - Run E2E tests with browser visible
-- `pnpm test:all` - Run all tests (unit, integration, and E2E)
-
-### Admin
-
-- `pnpm admin:setup` - Set up admin user account
-
-## 🏗️ Architecture
-
-### Authentication Flow
-
-- Uses Better Auth for secure authentication
-- Supports multiple providers (email/password, GitHub, Google)
-- Session management with database persistence
-- Role-based access control with admin permissions
-
-### Database Design
-
-- **Users**: User profiles and authentication data
-- **Sessions**: Active user sessions
-- **Files**: File metadata and storage references
-- **Payments**: Stripe subscription and payment data
-- **Payment Events**: Webhook event tracking
-
-### File Management
-
-- Secure file uploads with validation
-- Image processing and thumbnail generation
-- Cloud storage integration (S3/R2)
-- File access control and permissions
-- Support for multiple file types with size limits
-
-### Payment System
-
-- Stripe integration for subscriptions
-- Webhook handling for payment events
-- Subscription lifecycle management
-- Billing dashboard and controls
-- Multiple pricing plans with feature limits
-
-### Testing Architecture
-
-- **Unit Tests**: Component and utility function testing
-- **Integration Tests**: API endpoints and database operations
-- **E2E Tests**: Full user workflows with Playwright
-- **Test Coverage**: Comprehensive coverage reporting with thresholds
-
-## 🌍 Internationalization
 
 The application supports multiple languages:
 
@@ -245,89 +125,7 @@ The application supports multiple languages:
 
 Language files are located in `src/i18n/messages/`.
 
-## 🧪 Testing
 
-The project includes a comprehensive testing suite covering multiple levels:
-
-### Test Structure
-
-```
-tests/
-├── unit/                   # Unit tests
-│   ├── components/         # Component tests
-│   ├── hooks/              # Custom hook tests
-│   ├── lib/                # Utility function tests
-│   └── server/             # Server-side logic tests
-├── integration/            # Integration tests
-│   ├── api/                # API endpoint tests
-│   ├── database/           # Database operation tests
-│   └── services/           # Service layer tests
-└── e2e/                    # End-to-end tests
-    ├── auth/               # Authentication flows
-    ├── dashboard/          # Dashboard functionality
-    ├── admin/              # Admin features
-    ├── payment/            # Payment workflows
-    └── settings/           # User settings
-```
-
-### Test Coverage
-
-- **Unit Tests**: 85%+ line coverage for critical components
-- **Integration Tests**: API endpoints, database operations, and service workflows
-- **E2E Tests**: Complete user journeys across all major features
-- **Coverage Thresholds**: Enforced minimums for branches, functions, lines, and statements
-
-### Testing Features
-
-- **Multi-browser E2E**: Chromium, Firefox, and Safari support
-- **Visual Testing**: Screenshot comparison for UI consistency
-- **Database Testing**: Real database integration with cleanup
-- **Mock Services**: Comprehensive mocking for external APIs
-- **Parallel Execution**: Fast test runs with parallel processing
-
-### Running Tests
-
-```bash
-# Run all tests
-pnpm test:all
-
-# Run specific test suites
-pnpm test:unit
-pnpm test:integration
-pnpm test:e2e
-
-# Run with coverage
-pnpm test:coverage
-
-# Debug E2E tests
-pnpm test:e2e:headed
-pnpm test:e2e:ui
-```
-
-## 📖 Documentation
-
-Built-in documentation is available at `/docs` and includes:
-
-- Architecture overview
-- Installation guide
-- API documentation
-- Component library
-- Testing guide
-
-## 🚢 Deployment
-
-### Vercel (Recommended)
-
-1. Connect your repository to Vercel
-2. Set environment variables in Vercel dashboard
-3. Deploy automatically on push
-
-### Manual Deployment
-
-```bash
-pnpm build
-pnpm start
-```
 
 ## 🤝 Contributing
 
@@ -344,12 +142,6 @@ pnpm start
 6. Ensure all tests pass and coverage thresholds are met
 7. Submit a pull request
 
-### Code Quality Standards
-
-- All code must pass Biome linting and formatting
-- TypeScript strict mode compliance required
-- Minimum test coverage: 85% for critical components
-- All E2E tests must pass for core user flows
 
 ## 📄 License
 

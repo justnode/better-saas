@@ -1,0 +1,676 @@
+---
+title: 生产环境设置
+description: Better SaaS 生产环境完整设置指南，包含安全、性能和可靠性最佳实践
+---
+
+# 生产环境设置
+
+本指南涵盖 Better SaaS 生产环境的完整设置，包括安全加固、性能优化和监控配置。
+
+## 前置要求
+
+- Ubuntu 20.04+ 或类似的生产服务器
+- 域名和 DNS 控制权
+- SSL 证书（推荐 Let's Encrypt）
+- 数据库（推荐 PostgreSQL）
+- Redis 实例
+- 云存储（Cloudflare R2 或 AWS S3）
+- 邮件服务（SMTP）
+
+## 服务器要求
+
+### 最低配置
+- **CPU**: 2 核心
+- **内存**: 4GB
+- **存储**: 20GB SSD
+- **网络**: 1Gbps
+
+### 推荐配置
+- **CPU**: 4+ 核心
+- **内存**: 8GB+
+- **存储**: 50GB+ SSD
+- **网络**: 1Gbps+
+
+## 环境配置
+
+### 1. 环境变量
+
+创建生产环境 `.env` 文件：
+
+```
+# 应用配置
+NODE_ENV=production
+PORT=3000
+HOSTNAME=0.0.0.0
+
+# 数据库
+DATABASE_URL=postgresql://username:password@localhost:5432/bettersaas_prod
+
+# 认证
+BETTER_AUTH_SECRET=your-super-secure-secret-key-minimum-32-chars
+BETTER_AUTH_URL=https://yourdomain.com
+
+# OAuth 提供商
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Stripe
+STRIPE_SECRET_KEY=sk_live_your-live-stripe-secret-key
+STRIPE_PUBLISHABLE_KEY=pk_live_your-live-stripe-publishable-key
+STRIPE_WEBHOOK_SECRET=whsec_your-webhook-secret
+
+# 文件存储
+CLOUDFLARE_R2_ACCESS_KEY_ID=your-access-key
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=your-secret-key
+CLOUDFLARE_R2_BUCKET_NAME=your-production-bucket
+CLOUDFLARE_R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+
+# 邮件
+SMTP_HOST=smtp.your-provider.com
+SMTP_PORT=587
+SMTP_USER=your-email@domain.com
+SMTP_PASSWORD=your-email-password
+SMTP_FROM=noreply@yourdomain.com
+
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# 监控
+SENTRY_DSN=https://your-sentry-dsn
+LOG_LEVEL=info
+```
+
+### 2. 安全配置
+
+#### 环境变量安全
+```bash
+# 设置适当的权限
+chmod 600 .env
+chown app:app .env
+
+# 使用 systemd 环境文件
+sudo mkdir -p /etc/systemd/system/better-saas.service.d
+sudo tee /etc/systemd/system/better-saas.service.d/environment.conf << EOF
+[Service]
+EnvironmentFile=/opt/better-saas/.env
+EOF
+```
+
+#### 防火墙配置
+```bash
+# 启用 UFW
+sudo ufw enable
+
+# 允许 SSH
+sudo ufw allow ssh
+
+# 允许 HTTP/HTTPS
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# 允许数据库（如果是外部数据库）
+sudo ufw allow from your-db-server-ip to any port 5432
+
+# 拒绝所有其他入站连接
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+```
+
+## 数据库设置
+
+### PostgreSQL 安装
+```bash
+# 安装 PostgreSQL
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+
+# 创建数据库和用户
+sudo -u postgres psql << EOF
+CREATE DATABASE bettersaas_prod;
+CREATE USER bettersaas WITH ENCRYPTED PASSWORD 'your-secure-password';
+GRANT ALL PRIVILEGES ON DATABASE bettersaas_prod TO bettersaas;
+ALTER USER bettersaas CREATEDB;
+EOF
+```
+
+### 数据库安全
+```bash
+# 编辑 PostgreSQL 配置
+sudo nano /etc/postgresql/14/main/postgresql.conf
+
+# 关键设置：
+# listen_addresses = 'localhost'
+# ssl = on
+# log_statement = 'all'
+# log_min_duration_statement = 1000
+
+# 配置认证
+sudo nano /etc/postgresql/14/main/pg_hba.conf
+
+# 添加：
+# local   bettersaas_prod    bettersaas                        md5
+# host    bettersaas_prod    bettersaas    127.0.0.1/32        md5
+```
+
+### 数据库优化
+```sql
+-- 性能调优
+ALTER SYSTEM SET shared_buffers = '256MB';
+ALTER SYSTEM SET effective_cache_size = '1GB';
+ALTER SYSTEM SET maintenance_work_mem = '64MB';
+ALTER SYSTEM SET checkpoint_completion_target = 0.9;
+ALTER SYSTEM SET wal_buffers = '16MB';
+ALTER SYSTEM SET default_statistics_target = 100;
+
+-- 重启 PostgreSQL
+-- sudo systemctl restart postgresql
+```
+
+## Redis 设置
+
+### 安装
+```bash
+# 安装 Redis
+sudo apt install redis-server
+
+# 配置 Redis
+sudo nano /etc/redis/redis.conf
+
+# 关键设置：
+# bind 127.0.0.1
+# requirepass your-redis-password
+# maxmemory 512mb
+# maxmemory-policy allkeys-lru
+```
+
+### Redis 安全
+```bash
+# 设置适当的权限
+sudo chmod 640 /etc/redis/redis.conf
+sudo chown redis:redis /etc/redis/redis.conf
+
+# 启用并启动 Redis
+sudo systemctl enable redis-server
+sudo systemctl start redis-server
+```
+
+## SSL/TLS 配置
+
+### Let's Encrypt 和 Certbot
+```bash
+# 安装 Certbot
+sudo apt install certbot python3-certbot-nginx
+
+# 获取证书
+sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+
+# 测试续期
+sudo certbot renew --dry-run
+
+# 设置自动续期
+sudo crontab -e
+# 添加：0 12 * * * /usr/bin/certbot renew --quiet
+```
+
+### 手动 SSL 设置
+```bash
+# 创建 SSL 目录
+sudo mkdir -p /etc/ssl/private
+sudo mkdir -p /etc/ssl/certs
+
+# 复制证书
+sudo cp your-certificate.crt /etc/ssl/certs/
+sudo cp your-private-key.key /etc/ssl/private/
+
+# 设置权限
+sudo chmod 600 /etc/ssl/private/your-private-key.key
+sudo chmod 644 /etc/ssl/certs/your-certificate.crt
+```
+
+## 反向代理设置
+
+### Nginx 配置
+```bash
+# 安装 Nginx
+sudo apt install nginx
+
+# 创建站点配置
+sudo nano /etc/nginx/sites-available/better-saas
+```
+
+```nginx
+upstream better_saas {
+    server 127.0.0.1:3000;
+}
+
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com www.yourdomain.com;
+
+    # SSL 配置
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # 安全头
+    add_header X-Frame-Options DENY;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header Referrer-Policy "strict-origin-when-cross-origin";
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';";
+
+    # Gzip 配置
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied expired no-cache no-store private must-revalidate auth;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+
+    # 速率限制
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
+
+    # 主要位置
+    location / {
+        proxy_pass http://better_saas;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 86400;
+    }
+
+    # API 速率限制
+    location /api/ {
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass http://better_saas;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # 登录速率限制
+    location /api/auth/login {
+        limit_req zone=login burst=5 nodelay;
+        proxy_pass http://better_saas;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 静态文件
+    location /_next/static/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        proxy_pass http://better_saas;
+    }
+
+    # 健康检查
+    location /health {
+        access_log off;
+        proxy_pass http://better_saas;
+    }
+}
+```
+
+```bash
+# 启用站点
+sudo ln -s /etc/nginx/sites-available/better-saas /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+## 应用程序部署
+
+### 1. 用户设置
+```bash
+# 创建应用用户
+sudo useradd -m -s /bin/bash app
+sudo mkdir -p /opt/better-saas
+sudo chown app:app /opt/better-saas
+```
+
+### 2. 应用安装
+```bash
+# 切换到应用用户
+sudo su - app
+
+# 克隆仓库
+cd /opt/better-saas
+git clone https://github.com/your-org/better-saas.git .
+
+# 安装依赖
+npm install -g pnpm
+pnpm install --frozen-lockfile
+
+# 构建应用
+pnpm build
+
+# 运行数据库迁移
+pnpm db:migrate
+```
+
+### 3. Systemd 服务
+```bash
+# 创建 systemd 服务
+sudo tee /etc/systemd/system/better-saas.service << EOF
+[Unit]
+Description=Better SaaS Application
+After=network.target postgresql.service redis.service
+
+[Service]
+Type=simple
+User=app
+WorkingDirectory=/opt/better-saas
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/better-saas/.env
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/better-saas
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 启用并启动服务
+sudo systemctl daemon-reload
+sudo systemctl enable better-saas
+sudo systemctl start better-saas
+```
+
+## 监控设置
+
+### 1. 应用监控
+```bash
+# 安装监控工具
+sudo apt install htop iotop nethogs
+
+# 设置日志轮转
+sudo tee /etc/logrotate.d/better-saas << EOF
+/opt/better-saas/logs/*.log {
+    daily
+    missingok
+    rotate 52
+    compress
+    delaycompress
+    notifempty
+    create 644 app app
+}
+EOF
+```
+
+### 2. 健康检查
+创建健康检查脚本：
+```bash
+#!/bin/bash
+# /opt/better-saas/scripts/health-check.sh
+
+# 检查应用程序
+if ! curl -f http://localhost:3000/health > /dev/null 2>&1; then
+    echo "应用程序健康检查失败"
+    exit 1
+fi
+
+# 检查数据库
+if ! pg_isready -h localhost -p 5432 -U bettersaas > /dev/null 2>&1; then
+    echo "数据库健康检查失败"
+    exit 1
+fi
+
+# 检查 Redis
+if ! redis-cli ping > /dev/null 2>&1; then
+    echo "Redis 健康检查失败"
+    exit 1
+fi
+
+echo "所有健康检查通过"
+```
+
+### 3. 自动监控
+```bash
+# 添加到 crontab
+sudo crontab -e
+
+# 每 5 分钟添加健康检查
+*/5 * * * * /opt/better-saas/scripts/health-check.sh >> /var/log/health-check.log 2>&1
+
+# 添加磁盘空间检查
+0 */6 * * * df -h | grep -E '^/dev/' | awk '{print $5 " " $1}' | while read output; do usage=$(echo $output | awk '{print $1}' | sed 's/%//g'); partition=$(echo $output | awk '{print $2}'); if [ $usage -ge 80 ]; then echo "磁盘使用警告：$partition 使用率为 ${usage}%"; fi; done
+```
+
+## 备份策略
+
+### 1. 数据库备份
+```bash
+# 创建备份脚本
+sudo tee /opt/better-saas/scripts/backup-db.sh << EOF
+#!/bin/bash
+BACKUP_DIR="/opt/backups/database"
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="bettersaas_backup_\$DATE.sql"
+
+mkdir -p \$BACKUP_DIR
+pg_dump -h localhost -U bettersaas bettersaas_prod > \$BACKUP_DIR/\$BACKUP_FILE
+
+# 压缩备份
+gzip \$BACKUP_DIR/\$BACKUP_FILE
+
+# 删除 30 天前的备份
+find \$BACKUP_DIR -name "*.gz" -mtime +30 -delete
+
+echo "数据库备份完成：\$BACKUP_FILE.gz"
+EOF
+
+chmod +x /opt/better-saas/scripts/backup-db.sh
+```
+
+### 2. 文件备份
+```bash
+# 创建文件备份脚本
+sudo tee /opt/better-saas/scripts/backup-files.sh << EOF
+#!/bin/bash
+BACKUP_DIR="/opt/backups/files"
+DATE=$(date +%Y%m%d_%H%M%S)
+SOURCE_DIR="/opt/better-saas"
+
+mkdir -p \$BACKUP_DIR
+
+# 备份应用文件（排除 node_modules）
+tar -czf \$BACKUP_DIR/app_backup_\$DATE.tar.gz \
+    --exclude=node_modules \
+    --exclude=.next \
+    --exclude=logs \
+    -C \$SOURCE_DIR .
+
+# 删除 7 天前的备份
+find \$BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
+
+echo "文件备份完成：app_backup_\$DATE.tar.gz"
+EOF
+
+chmod +x /opt/better-saas/scripts/backup-files.sh
+```
+
+### 3. 自动备份
+```bash
+# 添加到 crontab
+sudo crontab -e
+
+# 每天凌晨 2 点数据库备份
+0 2 * * * /opt/better-saas/scripts/backup-db.sh
+
+# 每周日凌晨 3 点文件备份
+0 3 * * 0 /opt/better-saas/scripts/backup-files.sh
+```
+
+## 性能优化
+
+### 1. Node.js 优化
+```bash
+# 更新 systemd 服务以用于生产
+sudo nano /etc/systemd/system/better-saas.service
+
+# 添加优化标志
+[Service]
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS="--max-old-space-size=2048"
+ExecStart=/usr/bin/node --max-old-space-size=2048 server.js
+```
+
+### 2. 数据库优化
+```sql
+-- 创建索引以提高性能
+CREATE INDEX CONCURRENTLY idx_users_email ON users(email);
+CREATE INDEX CONCURRENTLY idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX CONCURRENTLY idx_files_user_id ON files(user_id);
+CREATE INDEX CONCURRENTLY idx_subscriptions_user_id ON subscriptions(user_id);
+
+-- 分析表
+ANALYZE;
+```
+
+### 3. 缓存策略
+```bash
+# 用于缓存的 Redis 配置
+sudo nano /etc/redis/redis.conf
+
+# 添加缓存设置
+maxmemory 512mb
+maxmemory-policy allkeys-lru
+save 900 1
+save 300 10
+save 60 10000
+```
+
+## 安全加固
+
+### 1. 系统安全
+```bash
+# 更新系统
+sudo apt update && sudo apt upgrade -y
+
+# 自动安装安全更新
+sudo apt install unattended-upgrades
+sudo dpkg-reconfigure -plow unattended-upgrades
+
+# 配置 fail2ban
+sudo apt install fail2ban
+sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+
+# SSH 加固
+sudo nano /etc/ssh/sshd_config
+# 设置：PermitRootLogin no
+# 设置：PasswordAuthentication no
+# 设置：Port 2222（可选）
+```
+
+### 2. 应用安全
+```bash
+# 设置适当的文件权限
+sudo chown -R app:app /opt/better-saas
+sudo chmod -R 755 /opt/better-saas
+sudo chmod 600 /opt/better-saas/.env
+
+# 设置日志监控
+sudo apt install logwatch
+sudo logwatch --detail Med --mailto admin@yourdomain.com --service All --range yesterday
+```
+
+## 故障排除
+
+### 常见问题
+
+1. **应用程序无法启动**
+   ```bash
+   # 检查日志
+   sudo journalctl -u better-saas -f
+   
+   # 检查端口使用
+   sudo netstat -tlnp | grep :3000
+   
+   # 检查权限
+   sudo -u app ls -la /opt/better-saas
+   ```
+
+2. **数据库连接问题**
+   ```bash
+   # 测试连接
+   sudo -u app psql -h localhost -U bettersaas -d bettersaas_prod
+   
+   # 检查 PostgreSQL 日志
+   sudo tail -f /var/log/postgresql/postgresql-14-main.log
+   ```
+
+3. **SSL 证书问题**
+   ```bash
+   # 检查证书
+   sudo certbot certificates
+   
+   # 测试 SSL
+   openssl s_client -connect yourdomain.com:443
+   
+   # 续期证书
+   sudo certbot renew
+   ```
+
+### 维护命令
+
+```bash
+# 重启应用
+sudo systemctl restart better-saas
+
+# 更新应用
+sudo su - app
+cd /opt/better-saas
+git pull origin main
+pnpm install --frozen-lockfile
+pnpm build
+sudo systemctl restart better-saas
+
+# 检查系统资源
+htop
+df -h
+free -h
+
+# 查看日志
+sudo journalctl -u better-saas -f
+sudo tail -f /var/log/nginx/access.log
+sudo tail -f /var/log/nginx/error.log
+```
+
+## 下一步
+
+- 设置 [CI/CD 流水线](./ci-cd) 进行自动化部署
+- 配置 [监控和告警](../development/monitoring)
+- 实施 [灾难恢复](../development/disaster-recovery)
+- 查看 [安全最佳实践](../development/security) 

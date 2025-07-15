@@ -1,4 +1,12 @@
 {
   "title": "文档",
-  "pages": ["index", "quickstart", "architecture", "Deployment"]
+  "pages": [
+    "index",
+    "quickstart", 
+    "architecture",
+    "deployment",
+    "development",
+    "features",
+    "customization"
+  ]
 }

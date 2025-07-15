@@ -1,0 +1,714 @@
+---
+title: 数据库开发指南
+---
+本指南涵盖了 Better SaaS 中的数据库开发模式、Drizzle ORM 使用和存储库模式。
+
+## 数据库架构
+
+### 技术栈
+
+- **ORM**: Drizzle ORM
+- **数据库**: PostgreSQL (Neon)
+- **连接**: 基于 HTTP 的无服务器连接
+- **迁移**: Drizzle 迁移
+- **模式**: 类型安全的模式定义
+
+### 数据库结构
+
+```
+src/server/db/
+├── index.ts                 # 数据库连接
+├── schema.ts               # 数据库模式定义
+├── types.ts                # 数据库类型和错误
+├── repositories/           # 存储库模式实现
+│   ├── base-repository.ts  # 基础存储库接口
+│   ├── file-repository.ts  # 文件操作
+│   ├── payment-repository.ts # 支付操作
+│   └── index.ts           # 存储库导出
+└── services/              # 数据库服务
+    └── index.ts           # 服务导出
+```
+
+## 模式定义
+
+### 核心模式
+
+```typescript
+// src/server/db/schema.ts
+import { boolean, integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+
+export const user = pgTable('user', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('email_verified')
+    .$defaultFn(() => false)
+    .notNull(),
+  image: text('image'),
+  createdAt: timestamp('created_at')
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: timestamp('updated_at')
+    .$defaultFn(() => new Date())
+    .notNull(),
+  role: text('role'),
+  banned: boolean('banned'),
+  banReason: text('ban_reason'),
+  banExpires: timestamp('ban_expires'),
+});
+
+export const file = pgTable('file', {
+  id: text('id').primaryKey(),
+  filename: text('filename').notNull(),
+  originalName: text('original_name').notNull(),
+  mimeType: text('mime_type').notNull(),
+  size: integer('size').notNull(),
+  width: integer('width'),
+  height: integer('height'),
+  r2Key: text('r2_key').notNull(),
+  thumbnailKey: text('thumbnail_key'),
+  uploadUserId: text('upload_user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at')
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: timestamp('updated_at')
+    .$defaultFn(() => new Date())
+    .notNull(),
+});
+
+export const payment = pgTable('payment', {
+  id: text('id').primaryKey(),
+  priceId: text('price_id').notNull(),
+  type: text('type').notNull(),
+  interval: text('interval'),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  customerId: text('customer_id').notNull(),
+  subscriptionId: text('subscription_id'),
+  status: text('status').notNull(),
+  periodStart: timestamp('period_start'),
+  periodEnd: timestamp('period_end'),
+  cancelAtPeriodEnd: boolean('cancel_at_period_end'),
+  trialStart: timestamp('trial_start'),
+  trialEnd: timestamp('trial_end'),
+  createdAt: timestamp('created_at')
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: timestamp('updated_at')
+    .$defaultFn(() => new Date())
+    .notNull(),
+});
+```
+
+### 模式最佳实践
+
+1. **命名约定**
+   - 列名使用 snake_case
+   - 表名和列名使用描述性名称
+   - 添加适当的外键约束
+
+2. **类型安全**
+   - 所有列使用 TypeScript 类型
+   - 定义适当的默认值
+   - 外键使用引用
+
+3. **时间戳**
+   - 始终包含 createdAt 和 updatedAt
+   - 使用一致的时间戳处理
+
+## 数据库连接
+
+### 连接设置
+
+```typescript
+// src/server/db/index.ts
+import { env } from '@/env';
+import { drizzle } from 'drizzle-orm/neon-http';
+import * as schema from './schema';
+
+const db = drizzle(env.DATABASE_URL, { schema });
+
+export default db;
+export * from './repositories';
+```
+
+### 配置
+
+```typescript
+// drizzle.config.ts
+import { defineConfig } from 'drizzle-kit';
+import { env } from '@/env';
+
+export default defineConfig({
+  schema: './src/server/db/schema.ts',
+  out: './drizzle',
+  dialect: 'postgresql',
+  dbCredentials: {
+    url: env.DATABASE_URL,
+  },
+});
+```
+
+## 存储库模式
+
+### 基础存储库
+
+```typescript
+// src/server/db/repositories/base-repository.ts
+import { DatabaseError } from '../types';
+
+export interface IBaseRepository<TSelect, TInsert> {
+  findById(id: string): Promise<TSelect | undefined>;
+  findAll(): Promise<TSelect[]>;
+  create(data: TInsert): Promise<TSelect>;
+  update(id: string, data: Partial<TInsert>): Promise<TSelect | undefined>;
+  delete(id: string): Promise<boolean>;
+  exists(id: string): Promise<boolean>;
+  count(): Promise<number>;
+}
+
+export abstract class BaseRepository<TSelect, TInsert>
+  implements IBaseRepository<TSelect, TInsert>
+{
+  abstract findById(id: string): Promise<TSelect | undefined>;
+  abstract findAll(): Promise<TSelect[]>;
+  abstract create(data: TInsert): Promise<TSelect>;
+  abstract update(id: string, data: Partial<TInsert>): Promise<TSelect | undefined>;
+  abstract delete(id: string): Promise<boolean>;
+  abstract exists(id: string): Promise<boolean>;
+  abstract count(): Promise<number>;
+
+  protected handleError(error: unknown, operation: string, code: string): never {
+    const message = error instanceof Error ? error.message : '未知错误';
+    throw new DatabaseError(`${operation}失败: ${message}`, code);
+  }
+}
+```
+
+### 文件存储库实现
+
+```typescript
+// src/server/db/repositories/file-repository.ts
+import { and, desc, eq, ilike, sql } from 'drizzle-orm';
+import type { FileInfo } from '@/lib/file-service';
+import db from '../index';
+import { file, user } from '../schema';
+
+export interface CreateFileData {
+  id: string;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  width?: number;
+  height?: number;
+  r2Key: string;
+  thumbnailKey?: string;
+  uploadUserId: string;
+}
+
+export interface FileListOptions {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export class FileRepository {
+  async create(data: CreateFileData): Promise<FileInfo> {
+    const [created] = await db
+      .insert(file)
+      .values({
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    if (!created) {
+      throw new Error('创建文件记录失败');
+    }
+
+    return this.toFileInfo(created);
+  }
+
+  async findById(id: string): Promise<FileInfo | null> {
+    const [found] = await db.select().from(file).where(eq(file.id, id));
+    return found ? this.toFileInfo(found) : null;
+  }
+
+  async findByUserId(userId: string, options: FileListOptions = {}): Promise<{
+    files: FileInfo[];
+    total: number;
+  }> {
+    const { page = 1, limit = 20, search = '' } = options;
+    const offset = (page - 1) * limit;
+
+    const conditions = [eq(file.uploadUserId, userId)];
+    
+    if (search) {
+      conditions.push(ilike(file.originalName, `%${search}%`));
+    }
+
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+
+    // 获取总数
+    const countResult = await db
+      .select({ count: sql`count(*)`.mapWith(Number) })
+      .from(file)
+      .where(whereClause);
+
+    const total = countResult[0]?.count || 0;
+
+    // 获取文件列表
+    const files = await db
+      .select()
+      .from(file)
+      .where(whereClause)
+      .orderBy(desc(file.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      files: files.map((f) => this.toFileInfo(f)),
+      total,
+    };
+  }
+
+  async findAll(options: FileListOptions = {}): Promise<{
+    files: FileInfo[];
+    total: number;
+  }> {
+    const { page = 1, limit = 20, search = '' } = options;
+    const offset = (page - 1) * limit;
+
+    let whereClause = undefined;
+    if (search) {
+      whereClause = ilike(file.originalName, `%${search}%`);
+    }
+
+    // 获取总数
+    const countResult = await db
+      .select({ count: sql`count(*)`.mapWith(Number) })
+      .from(file)
+      .where(whereClause);
+
+    const total = countResult[0]?.count || 0;
+
+    // 获取文件列表（关联用户表）
+    const files = await db
+      .select({
+        file: file,
+        user: {
+          email: user.email,
+        },
+      })
+      .from(file)
+      .leftJoin(user, eq(file.uploadUserId, user.id))
+      .where(whereClause)
+      .orderBy(desc(file.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      files: files.map((result) => this.toFileInfoWithUser(result.file, result.user?.email)),
+      total,
+    };
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const [deleted] = await db
+      .delete(file)
+      .where(eq(file.id, id))
+      .returning();
+
+    return !!deleted;
+  }
+
+  async deleteByUserId(userId: string, fileId: string): Promise<boolean> {
+    const [deleted] = await db
+      .delete(file)
+      .where(and(eq(file.id, fileId), eq(file.uploadUserId, userId)))
+      .returning();
+
+    return !!deleted;
+  }
+
+  private toFileInfo(record: any): FileInfo {
+    return {
+      id: record.id,
+      filename: record.filename,
+      originalName: record.originalName,
+      mimeType: record.mimeType,
+      size: record.size,
+      width: record.width,
+      height: record.height,
+      url: `https://cdn.example.com/${record.r2Key}`,
+      thumbnailUrl: record.thumbnailKey ? `https://cdn.example.com/${record.thumbnailKey}` : undefined,
+      uploadUserId: record.uploadUserId,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    };
+  }
+
+  private toFileInfoWithUser(record: any, userEmail?: string): FileInfo {
+    const fileInfo = this.toFileInfo(record);
+    return {
+      ...fileInfo,
+      userEmail,
+    };
+  }
+}
+
+export const fileRepository = new FileRepository();
+```
+
+### 支付存储库
+
+```typescript
+// src/server/db/repositories/payment-repository.ts
+import { eq, desc, and, inArray } from 'drizzle-orm';
+import db from '@/server/db';
+import { payment, paymentEvent } from '@/server/db/schema';
+import type { PaymentRecord, PaymentStatus, PaymentType, PaymentInterval } from '@/payment/types';
+import { v4 as uuidv4 } from 'uuid';
+
+export interface CreatePaymentData {
+  id?: string;
+  priceId: string;
+  type: PaymentType;
+  interval?: PaymentInterval;
+  userId: string;
+  customerId: string;
+  subscriptionId?: string;
+  status: PaymentStatus;
+  periodStart?: Date;
+  periodEnd?: Date;
+  cancelAtPeriodEnd?: boolean;
+  trialStart?: Date;
+  trialEnd?: Date;
+}
+
+export class PaymentRepository {
+  async create(data: CreatePaymentData): Promise<PaymentRecord> {
+    const paymentId = data.id || uuidv4();
+    
+    const [result] = await db
+      .insert(payment)
+      .values({
+        id: paymentId,
+        priceId: data.priceId,
+        type: data.type,
+        interval: data.interval || null,
+        userId: data.userId,
+        customerId: data.customerId,
+        subscriptionId: data.subscriptionId || null,
+        status: data.status,
+        periodStart: data.periodStart || null,
+        periodEnd: data.periodEnd || null,
+        cancelAtPeriodEnd: data.cancelAtPeriodEnd || null,
+        trialStart: data.trialStart || null,
+        trialEnd: data.trialEnd || null,
+      })
+      .returning();
+
+    return this.mapToPaymentRecord(result);
+  }
+
+  async findById(id: string): Promise<PaymentRecord | null> {
+    const result = await db
+      .select()
+      .from(payment)
+      .where(eq(payment.id, id))
+      .limit(1);
+
+    return result[0] ? this.mapToPaymentRecord(result[0]) : null;
+  }
+
+  async findByUserId(userId: string): Promise<PaymentRecord[]> {
+    const results = await db
+      .select()
+      .from(payment)
+      .where(eq(payment.userId, userId))
+      .orderBy(desc(payment.createdAt));
+
+    return results.map(this.mapToPaymentRecord);
+  }
+
+  async findBySubscriptionId(subscriptionId: string): Promise<PaymentRecord | null> {
+    const result = await db
+      .select()
+      .from(payment)
+      .where(eq(payment.subscriptionId, subscriptionId))
+      .limit(1);
+
+    return result[0] ? this.mapToPaymentRecord(result[0]) : null;
+  }
+
+  async findActiveSubscriptionByUserId(userId: string): Promise<PaymentRecord | null> {
+    const result = await db
+      .select()
+      .from(payment)
+      .where(
+        and(
+          eq(payment.userId, userId),
+          eq(payment.type, 'subscription'),
+          inArray(payment.status, ['active', 'trialing', 'past_due'])
+        )
+      )
+      .orderBy(desc(payment.createdAt))
+      .limit(1);
+
+    return result[0] ? this.mapToPaymentRecord(result[0]) : null;
+  }
+
+  async update(id: string, data: Partial<CreatePaymentData>): Promise<PaymentRecord | null> {
+    const [result] = await db
+      .update(payment)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(payment.id, id))
+      .returning();
+
+    return result ? this.mapToPaymentRecord(result) : null;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const [result] = await db
+      .delete(payment)
+      .where(eq(payment.id, id))
+      .returning();
+
+    return !!result;
+  }
+
+  private mapToPaymentRecord(record: any): PaymentRecord {
+    return {
+      id: record.id,
+      priceId: record.priceId,
+      type: record.type as PaymentType,
+      interval: record.interval as PaymentInterval,
+      userId: record.userId,
+      customerId: record.customerId,
+      subscriptionId: record.subscriptionId,
+      status: record.status as PaymentStatus,
+      periodStart: record.periodStart,
+      periodEnd: record.periodEnd,
+      cancelAtPeriodEnd: record.cancelAtPeriodEnd,
+      trialStart: record.trialStart,
+      trialEnd: record.trialEnd,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    };
+  }
+}
+
+export const paymentRepository = new PaymentRepository();
+```
+
+## 数据库操作
+
+### 查询模式
+
+```typescript
+// 基本查询
+const users = await db.select().from(user);
+const userById = await db.select().from(user).where(eq(user.id, userId));
+
+// 联接查询
+const filesWithUsers = await db
+  .select({
+    file: file,
+    user: user,
+  })
+  .from(file)
+  .leftJoin(user, eq(file.uploadUserId, user.id));
+
+// 分页查询
+const paginatedFiles = await db
+  .select()
+  .from(file)
+  .orderBy(desc(file.createdAt))
+  .limit(20)
+  .offset(0);
+
+// 筛选查询
+const searchResults = await db
+  .select()
+  .from(file)
+  .where(ilike(file.originalName, `%${search}%`));
+
+// 聚合查询
+const fileCount = await db
+  .select({ count: sql`count(*)`.mapWith(Number) })
+  .from(file);
+```
+
+### 事务
+
+```typescript
+// 事务示例
+await db.transaction(async (tx) => {
+  const user = await tx.insert(userTable).values(userData).returning();
+  const profile = await tx.insert(profileTable).values({
+    userId: user[0].id,
+    ...profileData,
+  }).returning();
+  
+  return { user: user[0], profile: profile[0] };
+});
+```
+
+## 迁移
+
+### 创建迁移
+
+```bash
+# 生成迁移
+pnpm drizzle-kit generate
+
+# 推送到数据库
+pnpm drizzle-kit push
+
+# 查看迁移
+pnpm drizzle-kit up
+```
+
+### 迁移示例
+
+```sql
+-- drizzle/0000_dark_sentry.sql
+CREATE TABLE IF NOT EXISTS "user" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"email" text NOT NULL,
+	"email_verified" boolean DEFAULT false NOT NULL,
+	"image" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"role" text,
+	"banned" boolean,
+	"ban_reason" text,
+	"ban_expires" timestamp,
+	CONSTRAINT "user_email_unique" UNIQUE("email")
+);
+```
+
+## 错误处理
+
+### 数据库错误
+
+```typescript
+// src/server/db/types.ts
+export class DatabaseError extends Error {
+  constructor(
+    message: string,
+    public code?: string
+  ) {
+    super(message);
+    this.name = 'DatabaseError';
+  }
+}
+
+// 在存储库中使用
+try {
+  const result = await db.insert(table).values(data);
+  return result;
+} catch (error) {
+  this.handleError(error, 'create', 'DB_CREATE_ERROR');
+}
+```
+
+## 测试
+
+### 数据库测试
+
+```typescript
+// tests/integration/database/user-operations.test.ts
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import db from '@/server/db';
+import { user } from '@/server/db/schema';
+
+describe('用户数据库操作', () => {
+  beforeEach(async () => {
+    // 清理测试数据
+    await db.delete(user);
+  });
+
+  afterEach(async () => {
+    // 测试后清理
+    await db.delete(user);
+  });
+
+  it('应该创建用户', async () => {
+    const userData = {
+      id: 'test-user-1',
+      name: 'Test User',
+      email: 'test@example.com',
+    };
+
+    const [created] = await db.insert(user).values(userData).returning();
+
+    expect(created).toBeDefined();
+    expect(created.email).toBe(userData.email);
+  });
+
+  it('应该根据邮箱查找用户', async () => {
+    const userData = {
+      id: 'test-user-2',
+      name: 'Test User 2',
+      email: 'test2@example.com',
+    };
+
+    await db.insert(user).values(userData);
+
+    const found = await db.select().from(user).where(eq(user.email, userData.email));
+
+    expect(found).toHaveLength(1);
+    expect(found[0].email).toBe(userData.email);
+  });
+});
+```
+
+## 最佳实践
+
+### 1. 存储库模式
+
+- 使用存储库进行数据访问逻辑
+- 将业务逻辑与数据访问分离
+- 实现适当的错误处理
+- 使用 TypeScript 进行类型安全
+
+### 2. 查询优化
+
+- 为频繁查询的列使用索引
+- 为大数据集实现分页
+- 使用适当的联接查询
+- 避免 N+1 查询问题
+
+### 3. 模式设计
+
+- 使用适当的外键约束
+- 在适当的地方实现软删除
+- 使用一致的命名约定
+- 添加适当的索引
+
+### 4. 错误处理
+
+- 实现适当的错误类型
+- 记录带有上下文的数据库错误
+- 优雅地处理约束违反
+- 对相关操作使用事务
+
+### 5. 测试
+
+- 为数据库操作编写集成测试
+- 使用测试数据库进行测试
+- 正确清理测试数据
+- 测试错误场景
+
+本指南为使用 Drizzle ORM 在 Better SaaS 中进行数据库开发提供了全面的基础。遵循这些模式和实践，以维护强大且可扩展的数据库层。 

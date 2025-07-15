@@ -1,0 +1,834 @@
+---
+title: CI/CD Pipeline
+description: Set up automated continuous integration and deployment pipeline for Better SaaS with GitHub Actions, testing, and deployment automation
+---
+
+# CI/CD Pipeline
+
+This guide covers setting up a complete CI/CD pipeline for Better SaaS using GitHub Actions, including automated testing, building, and deployment to production environments.
+
+## Overview
+
+Our CI/CD pipeline includes:
+- **Continuous Integration**: Automated testing, linting, and building
+- **Continuous Deployment**: Automated deployment to staging and production
+- **Quality Gates**: Code quality checks and security scanning
+- **Rollback Capabilities**: Quick rollback in case of issues
+
+## GitHub Actions Workflow
+
+### 1. Basic Workflow Structure
+
+Create `.github/workflows/ci-cd.yml`:
+
+```yaml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18'
+  PNPM_VERSION: '8'
+
+jobs:
+  test:
+    name: Test & Quality Checks
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bettersaas_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run linting
+        run: pnpm lint
+
+      - name: Run type checking
+        run: pnpm type-check
+
+      - name: Run unit tests
+        run: pnpm test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bettersaas_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Run integration tests
+        run: pnpm test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bettersaas_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Run E2E tests
+        run: pnpm test:e2e
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bettersaas_test
+          REDIS_URL: redis://localhost:6379
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Audit dependencies
+        run: pnpm audit
+
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.ref == 'refs/heads/main'
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    steps:
+      - name: Deploy to staging
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /opt/better-saas
+            docker-compose pull
+            docker-compose up -d
+            docker system prune -f
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Deploy to production
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            cd /opt/better-saas
+            docker-compose pull
+            docker-compose up -d
+            docker system prune -f
+
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f https://yourdomain.com/health || exit 1
+
+      - name: Notify deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+### 2. Environment-Specific Workflows
+
+#### Staging Deployment
+Create `.github/workflows/staging.yml`:
+
+```yaml
+name: Staging Deployment
+
+on:
+  push:
+    branches: [ develop ]
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Deploy to staging server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /opt/better-saas-staging
+            git pull origin develop
+            pnpm install --frozen-lockfile
+            pnpm build
+            pnpm db:migrate
+            sudo systemctl restart better-saas-staging
+
+      - name: Run smoke tests
+        run: |
+          sleep 30
+          curl -f https://staging.yourdomain.com/health || exit 1
+```
+
+#### Production Deployment
+Create `.github/workflows/production.yml`:
+
+```yaml
+name: Production Deployment
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Create deployment backup
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            cd /opt/better-saas
+            tar -czf backup-$(date +%Y%m%d_%H%M%S).tar.gz \
+              --exclude=node_modules \
+              --exclude=.next \
+              --exclude=logs \
+              .
+
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            cd /opt/better-saas
+            git pull origin main
+            pnpm install --frozen-lockfile
+            pnpm build
+            pnpm db:migrate
+            sudo systemctl restart better-saas
+
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f https://yourdomain.com/health || exit 1
+
+      - name: Notify deployment success
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          text: 'Production deployment successful! 🚀'
+```
+
+## Quality Gates
+
+### 1. Code Quality Checks
+
+Create `.github/workflows/quality.yml`:
+
+```yaml
+name: Code Quality
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm lint
+
+      - name: Run Prettier
+        run: pnpm format:check
+
+      - name: Run TypeScript check
+        run: pnpm type-check
+
+      - name: Run tests with coverage
+        run: pnpm test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+```
+
+### 2. Security Scanning
+
+Create `.github/workflows/security.yml`:
+
+```yaml
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * 1' # Weekly on Monday at 2 AM
+
+jobs:
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Dependency audit
+        run: |
+          npm audit --audit-level moderate
+          pnpm audit
+
+      - name: CodeQL Analysis
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript, typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+```
+
+## Database Migrations
+
+### 1. Migration Workflow
+
+Create `.github/workflows/migrations.yml`:
+
+```yaml
+name: Database Migrations
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'drizzle/**'
+      - 'src/server/db/schema.ts'
+
+jobs:
+  migrate:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run migrations on production
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            cd /opt/better-saas
+            pnpm db:migrate
+            pnpm db:seed
+```
+
+### 2. Rollback Capabilities
+
+Create rollback script in `scripts/rollback.sh`:
+
+```bash
+#!/bin/bash
+
+# Rollback script for Better SaaS deployment
+set -e
+
+BACKUP_DIR="/opt/backups"
+ROLLBACK_TAG=${1:-"previous"}
+
+echo "Starting rollback to $ROLLBACK_TAG..."
+
+# Stop application
+sudo systemctl stop better-saas
+
+# Restore from backup
+if [ -f "$BACKUP_DIR/backup-$ROLLBACK_TAG.tar.gz" ]; then
+    cd /opt/better-saas
+    tar -xzf "$BACKUP_DIR/backup-$ROLLBACK_TAG.tar.gz"
+    echo "Application files restored from backup"
+else
+    echo "Backup file not found, rolling back via git..."
+    cd /opt/better-saas
+    git checkout $ROLLBACK_TAG
+    pnpm install --frozen-lockfile
+    pnpm build
+fi
+
+# Restore database if needed
+if [ -f "$BACKUP_DIR/db-backup-$ROLLBACK_TAG.sql.gz" ]; then
+    echo "Restoring database backup..."
+    gunzip -c "$BACKUP_DIR/db-backup-$ROLLBACK_TAG.sql.gz" | psql -U bettersaas -d bettersaas_prod
+fi
+
+# Start application
+sudo systemctl start better-saas
+
+# Health check
+sleep 30
+if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+    echo "Rollback successful! Application is healthy."
+else
+    echo "Rollback failed! Application is not responding."
+    exit 1
+fi
+```
+
+## Monitoring and Notifications
+
+### 1. Slack Notifications
+
+Create `.github/workflows/notifications.yml`:
+
+```yaml
+name: Notifications
+
+on:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types:
+      - completed
+
+jobs:
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify on success
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          text: |
+            ✅ Deployment successful!
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+
+      - name: Notify on failure
+        if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          text: |
+            ❌ Deployment failed!
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Please check the logs for details.
+```
+
+### 2. Email Notifications
+
+Configure email notifications in your workflow:
+
+```yaml
+- name: Send email notification
+  if: failure()
+  uses: dawidd6/action-send-mail@v3
+  with:
+    server_address: smtp.gmail.com
+    server_port: 465
+    username: ${{ secrets.EMAIL_USERNAME }}
+    password: ${{ secrets.EMAIL_PASSWORD }}
+    subject: 'Deployment Failed - Better SaaS'
+    body: |
+      The deployment pipeline has failed.
+      
+      Repository: ${{ github.repository }}
+      Branch: ${{ github.ref }}
+      Commit: ${{ github.sha }}
+      
+      Please check the GitHub Actions logs for more details.
+    to: admin@yourdomain.com
+    from: noreply@yourdomain.com
+```
+
+## Environment Configuration
+
+### 1. GitHub Secrets
+
+Configure the following secrets in your GitHub repository:
+
+#### Production Environment
+- `PRODUCTION_HOST`: Production server IP/hostname
+- `PRODUCTION_USER`: SSH username for production
+- `PRODUCTION_SSH_KEY`: Private SSH key for production
+- `DATABASE_URL`: Production database connection string
+- `BETTER_AUTH_SECRET`: Production auth secret
+- `STRIPE_SECRET_KEY`: Production Stripe secret key
+- `CLOUDFLARE_R2_ACCESS_KEY_ID`: Production R2 access key
+- `CLOUDFLARE_R2_SECRET_ACCESS_KEY`: Production R2 secret key
+
+#### Staging Environment
+- `STAGING_HOST`: Staging server IP/hostname
+- `STAGING_USER`: SSH username for staging
+- `STAGING_SSH_KEY`: Private SSH key for staging
+
+#### Notifications
+- `SLACK_WEBHOOK`: Slack webhook URL for notifications
+- `EMAIL_USERNAME`: SMTP username for email notifications
+- `EMAIL_PASSWORD`: SMTP password for email notifications
+
+#### External Services
+- `CODECOV_TOKEN`: Codecov token for coverage reports
+- `SONAR_TOKEN`: SonarCloud token for code quality
+- `GITHUB_TOKEN`: GitHub token (automatically provided)
+
+### 2. Environment Files
+
+Create environment-specific configuration files:
+
+#### `.env.staging`
+```
+NODE_ENV=staging
+DATABASE_URL=postgresql://staging_user:password@staging-db:5432/bettersaas_staging
+BETTER_AUTH_URL=https://staging.yourdomain.com
+STRIPE_SECRET_KEY=sk_test_staging_key
+```
+
+#### `.env.production`
+```
+NODE_ENV=production
+DATABASE_URL=postgresql://prod_user:password@prod-db:5432/bettersaas_prod
+BETTER_AUTH_URL=https://yourdomain.com
+STRIPE_SECRET_KEY=sk_live_production_key
+```
+
+## Performance Optimization
+
+### 1. Build Optimization
+
+Optimize your build process:
+
+```yaml
+- name: Build with optimizations
+  run: |
+    export NODE_ENV=production
+    export NEXT_TELEMETRY_DISABLED=1
+    pnpm build
+  env:
+    NEXT_TELEMETRY_DISABLED: 1
+```
+
+### 2. Cache Optimization
+
+Implement intelligent caching:
+
+```yaml
+- name: Cache node modules
+  uses: actions/cache@v3
+  with:
+    path: ~/.pnpm-store
+    key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+    restore-keys: |
+      ${{ runner.os }}-pnpm-
+
+- name: Cache Next.js build
+  uses: actions/cache@v3
+  with:
+    path: |
+      ~/.npm
+      ${{ github.workspace }}/.next/cache
+    key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+    restore-keys: |
+      ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Build Failures**
+   ```bash
+   # Check logs
+   cat /var/log/better-saas/build.log
+   
+   # Verify dependencies
+   pnpm install --frozen-lockfile
+   
+   # Clear cache
+   pnpm store prune
+   ```
+
+2. **Deployment Failures**
+   ```bash
+   # Check service status
+   sudo systemctl status better-saas
+   
+   # Check deployment logs
+   sudo journalctl -u better-saas -f
+   
+   # Verify file permissions
+   ls -la /opt/better-saas
+   ```
+
+3. **Database Migration Issues**
+   ```bash
+   # Check migration status
+   pnpm db:status
+   
+   # Rollback migration
+   pnpm db:rollback
+   
+   # Reset database
+   pnpm db:reset
+   ```
+
+### Debugging Commands
+
+```bash
+# Check workflow status
+gh workflow list
+gh workflow view ci-cd.yml
+
+# Check deployment logs
+ssh user@server 'sudo journalctl -u better-saas -f'
+
+# Test deployment locally
+docker-compose up -d
+curl -f http://localhost:3000/health
+```
+
+## Best Practices
+
+1. **Branch Protection**: Enable branch protection rules for main branch
+2. **Required Reviews**: Require code reviews before merging
+3. **Status Checks**: Make CI/CD checks required for merging
+4. **Automated Testing**: Maintain high test coverage
+5. **Security Scanning**: Regular security scans and dependency updates
+6. **Monitoring**: Monitor deployment success and application health
+7. **Rollback Strategy**: Always have a rollback plan ready
+8. **Documentation**: Keep deployment documentation up to date
+
+## Next Steps
+
+- Set up [Monitoring and Alerting](../development/monitoring)
+- Configure [Error Tracking](../development/error-tracking)
+- Implement [Performance Monitoring](../development/performance)
+- Review [Security Best Practices](../development/security) 

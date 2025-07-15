@@ -1,0 +1,478 @@
+---
+title: API 开发指南
+---
+本指南涵盖了 Better SaaS 中 API 开发模式、Server Actions 和 Webhook 实现。
+
+## API 架构
+
+### Next.js App Router API 结构
+
+```
+src/app/api/
+├── auth/
+│   └── [...all]/
+│       └── route.ts          # Better Auth 处理器
+└── webhooks/
+    └── stripe/
+        └── route.ts          # Stripe webhook 处理器
+```
+
+### API 路由模式
+
+```typescript
+// src/app/api/example/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth/auth';
+
+export async function GET(request: NextRequest) {
+  try {
+    // 身份验证检查
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // 业务逻辑
+    const data = await getExampleData(session.user.id);
+
+    return NextResponse.json({ data });
+  } catch (error) {
+    console.error('API Error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    
+    // 验证输入
+    const validatedData = validateInput(body);
+    
+    // 处理请求
+    const result = await processData(validatedData, session.user.id);
+
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('API Error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## Server Actions
+
+### Server Action 模式
+
+```typescript
+// src/server/actions/example-actions.ts
+'use server';
+
+import { auth } from '@/lib/auth/auth';
+import { headers } from 'next/headers';
+import { getErrorMessage } from './error-messages';
+import { ErrorLogger } from '@/lib/logger/logger-utils';
+
+const actionLogger = new ErrorLogger('example-actions');
+
+export interface ExampleResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
+export async function exampleAction(
+  formData: FormData
+): Promise<ExampleResponse> {
+  let session: { user?: { id: string } } | null = null;
+
+  try {
+    // 身份验证
+    session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      throw new Error(await getErrorMessage('unauthorizedAccess'));
+    }
+
+    // 提取并验证数据
+    const data = extractFormData(formData);
+    validateData(data);
+
+    // 业务逻辑
+    const result = await processAction(data, session.user.id);
+
+    return {
+      success: true,
+      data: result,
+    };
+  } catch (error) {
+    actionLogger.logError(error as Error, {
+      operation: 'exampleAction',
+      userId: session?.user?.id,
+    });
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Action failed',
+    };
+  }
+}
+```
+
+### 文件上传 Action
+
+```typescript
+// src/server/actions/file-actions.ts
+export async function uploadFileAction(
+  formData: FormData
+): Promise<FileUploadResponse> {
+  let session: { user?: User } | null = null;
+  let file: File | null = null;
+
+  try {
+    session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      throw new Error(await getErrorMessage('unauthorizedAccess'));
+    }
+
+    file = formData.get('file') as File;
+
+    if (!file) {
+      throw new Error(await getErrorMessage('noFileSelected'));
+    }
+
+    const fileInfo = await uploadFile(file, session.user.id);
+
+    return {
+      success: true,
+      file: fileInfo,
+    };
+  } catch (error) {
+    fileErrorLogger.logError(error as Error, {
+      operation: 'uploadFile',
+      userId: session?.user?.id,
+      fileName: file?.name,
+    });
+
+    throw new Error(
+      error instanceof Error ? error.message : '文件上传失败'
+    );
+  }
+}
+```
+
+### 错误处理
+
+```typescript
+// src/server/actions/error-messages.ts
+import { getLocale } from 'next-intl/server';
+
+export async function getErrorMessage(key: string): Promise<string> {
+  const locale = await getLocale();
+  
+  const messages = {
+    zh: {
+      unauthorizedAccess: '未授权访问',
+      fileNotFound: '未找到文件',
+      fileUploadFailed: '文件上传失败',
+      // ... 更多消息
+    },
+    en: {
+      unauthorizedAccess: 'Unauthorized access',
+      fileNotFound: 'File not found',
+      fileUploadFailed: 'File upload failed',
+      // ... 更多消息
+    },
+  };
+
+  const localeMessages = messages[locale as keyof typeof messages] || messages.en;
+  return localeMessages[key as keyof typeof localeMessages] || key;
+}
+```
+
+## Webhook 实现
+
+### Stripe Webhook 处理器
+
+```typescript
+// src/app/api/webhooks/stripe/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { StripeProvider } from '@/payment/stripe/provider';
+import { paymentRepository } from '@/server/db/repositories/payment-repository';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.text();
+    const signature = request.headers.get('stripe-signature');
+
+    if (!signature) {
+      return NextResponse.json(
+        { error: 'Missing signature' },
+        { status: 400 }
+      );
+    }
+
+    const stripeProvider = new StripeProvider();
+    
+    // 验证 webhook 签名
+    const isValid = await stripeProvider.verifyWebhook(body, signature);
+    if (!isValid) {
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 400 }
+      );
+    }
+
+    // 构造事件
+    const event = stripeProvider.constructWebhookEvent(body, signature);
+
+    // 处理事件
+    await handleStripeEvent(event);
+
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    return NextResponse.json(
+      { error: 'Webhook handler failed' },
+      { status: 500 }
+    );
+  }
+}
+
+async function handleStripeEvent(event: Stripe.Event) {
+  switch (event.type) {
+    case 'checkout.session.completed':
+      await handleCheckoutSessionCompleted(event);
+      break;
+    case 'customer.subscription.updated':
+      await handleSubscriptionUpdated(event);
+      break;
+    // ... 更多事件处理器
+  }
+}
+```
+
+## 身份验证集成
+
+### 受保护的 API 路由
+
+```typescript
+// src/lib/auth/api-middleware.ts
+import { auth } from '@/lib/auth/auth';
+import { isAdmin } from '@/lib/auth/permissions';
+import { NextRequest } from 'next/server';
+
+export async function withAuth(
+  request: NextRequest,
+  handler: (request: NextRequest, user: any) => Promise<Response>
+) {
+  try {
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    if (!session?.user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401 }
+      );
+    }
+
+    return handler(request, session.user);
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: 'Authentication failed' }),
+      { status: 401 }
+    );
+  }
+}
+
+export async function withAdminAuth(
+  request: NextRequest,
+  handler: (request: NextRequest, user: any) => Promise<Response>
+) {
+  return withAuth(request, async (req, user) => {
+    if (!isAdmin(user)) {
+      return new Response(
+        JSON.stringify({ error: 'Admin access required' }),
+        { status: 403 }
+      );
+    }
+
+    return handler(req, user);
+  });
+}
+```
+
+## API 测试
+
+### 集成测试
+
+```typescript
+// tests/integration/api/example-api.test.ts
+import { describe, it, expect } from '@jest/globals';
+
+describe('Example API Integration Tests', () => {
+  it('should handle authenticated requests', async () => {
+    const mockSession = {
+      user: { id: 'user_123', email: 'test@example.com' }
+    };
+
+    // Mock authentication
+    jest.mocked(auth.api.getSession).mockResolvedValue(mockSession);
+
+    const response = await GET(mockRequest);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toHaveProperty('data');
+  });
+
+  it('should reject unauthenticated requests', async () => {
+    jest.mocked(auth.api.getSession).mockResolvedValue(null);
+
+    const response = await GET(mockRequest);
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.error).toBe('Unauthorized');
+  });
+});
+```
+
+## 最佳实践
+
+### 1. 错误处理
+
+- 始终在 API 处理器中使用 try-catch 块
+- 使用一致的错误响应格式
+- 记录带有上下文信息的错误
+- 返回适当的 HTTP 状态码
+
+### 2. 身份验证
+
+- 在每个受保护的端点上验证会话
+- 使用中间件处理通用身份验证逻辑
+- 实现适当的权限检查
+- 优雅地处理身份验证错误
+
+### 3. 输入验证
+
+- 验证所有输入数据
+- 使用 TypeScript 进行类型安全
+- 为公共端点实现速率限制
+- 清理用户输入
+
+### 4. 性能
+
+- 使用数据库连接池
+- 在适当的地方实现缓存
+- 优化数据库查询
+- 对大响应使用流式传输
+
+### 5. 安全性
+
+- 验证 webhook 签名
+- 在生产环境中使用 HTTPS
+- 正确实现 CORS
+- 永远不要在响应中暴露敏感数据
+
+## 常见模式
+
+### 分页
+
+```typescript
+export async function getListAction(options: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}) {
+  const { page = 1, limit = 20, search = '' } = options;
+  const offset = (page - 1) * limit;
+
+  const result = await db.select()
+    .from(table)
+    .where(search ? ilike(table.name, `%${search}%`) : undefined)
+    .limit(limit)
+    .offset(offset);
+
+  const total = await db.select({ count: count() })
+    .from(table)
+    .where(search ? ilike(table.name, `%${search}%`) : undefined);
+
+  return {
+    data: result,
+    pagination: {
+      page,
+      limit,
+      total: total[0]?.count || 0,
+      totalPages: Math.ceil((total[0]?.count || 0) / limit),
+    },
+  };
+}
+```
+
+### 文件上传
+
+```typescript
+export async function handleFileUpload(
+  file: File,
+  userId: string
+): Promise<FileInfo> {
+  // 验证文件
+  const validation = validateFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
+  // 生成唯一文件名
+  const filename = generateUniqueFilename(file.name);
+  const r2Key = generateR2Key(filename);
+
+  // 上传到存储
+  const uploadResult = await r2Client.upload(r2Key, file);
+  
+  // 保存到数据库
+  const fileRecord = await db.insert(fileTable).values({
+    id: generateId(),
+    filename,
+    originalName: file.name,
+    mimeType: file.type,
+    size: file.size,
+    r2Key,
+    uploadUserId: userId,
+  }).returning();
+
+  return toFileInfo(fileRecord[0]);
+}
+```
+
+本指南为在 Better SaaS 中开发强大的 API 提供了基础。遵循这些模式和最佳实践，以保持 API 端点的一致性和可靠性。 

@@ -1,0 +1,9 @@
+{
+  "title": "项目特色",
+  "defaultOpen": true,
+  "pages": [
+    "authentication",
+    "file-management",
+    "payment-billing"
+  ]
+}

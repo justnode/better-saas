@@ -1,6 +1,6 @@
 {
   "title": "Deployment",
-  "defaultOpen": false,
+  "defaultOpen": true,
   "pages": [
     "vercel",
     "docker"

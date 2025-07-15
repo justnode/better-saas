@@ -1,25 +1,588 @@
 ---
 title: Docker Deployment
+description: Deploy Better SaaS using Docker containers for consistent and scalable deployment
 ---
 
 # Docker Deployment
 
-## Introduction
-
-Deploy Better SaaS application using Docker containerization.
+Deploy Better SaaS using Docker containers for consistent, scalable, and portable deployment across different environments.
 
 ## Prerequisites
 
-- Docker installed
-- Docker Compose installed
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+- 2GB+ RAM available
+- Basic Docker knowledge
 
-## Installation Steps
+## Quick Start with Docker
 
-1. Build Docker image
-2. Configure docker-compose.yml
-3. Start containers
-4. Verify deployment
+### 1. Clone and Setup
 
-## Configuration
+```bash
+git clone https://github.com/your-org/better-saas.git
+cd better-saas
+cp env.example .env
+```
 
-Detailed instructions for Docker configuration files and environment variables.
+### 2. Configure Environment
+
+Edit `.env` file with your configuration:
+
+```
+# Database
+DATABASE_URL=postgresql://postgres:password@db:5432/bettersaas
+
+# Authentication
+BETTER_AUTH_SECRET=your-super-secret-key-here
+BETTER_AUTH_URL=http://localhost:3000
+
+# GitHub OAuth
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Stripe
+STRIPE_SECRET_KEY=sk_test_your-stripe-secret-key
+STRIPE_PUBLISHABLE_KEY=pk_test_your-stripe-publishable-key
+STRIPE_WEBHOOK_SECRET=whsec_your-webhook-secret
+
+# File Storage (Cloudflare R2)
+CLOUDFLARE_R2_ACCESS_KEY_ID=your-access-key
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=your-secret-key
+CLOUDFLARE_R2_BUCKET_NAME=your-bucket-name
+CLOUDFLARE_R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+```
+
+### 3. Build and Run
+
+```bash
+# Build and start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+## Docker Compose Configuration
+
+Create `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@db:5432/bettersaas
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: bettersaas
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+## Dockerfile
+
+Create optimized `Dockerfile`:
+
+```dockerfile
+# Build stage
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+COPY packages/ ./packages/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build application
+RUN pnpm build
+
+# Production stage
+FROM node:18-alpine AS runner
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy built application
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+# Set correct permissions
+RUN chown -R nextjs:nodejs /app
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
+
+CMD ["node", "server.js"]
+```
+
+## Multi-Stage Build Optimization
+
+### Development Dockerfile
+
+```dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+RUN npm install -g pnpm
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["pnpm", "dev"]
+```
+
+### Production Dockerfile
+
+```dockerfile
+FROM node:18-alpine AS deps
+WORKDIR /app
+RUN npm install -g pnpm
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --prod --frozen-lockfile
+
+FROM node:18-alpine AS builder
+WORKDIR /app
+RUN npm install -g pnpm
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY . .
+RUN pnpm build
+
+FROM node:18-alpine AS runner
+WORKDIR /app
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+RUN chown -R nextjs:nodejs /app
+USER nextjs
+
+EXPOSE 3000
+ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
+
+CMD ["node", "server.js"]
+```
+
+## Environment-Specific Configurations
+
+### Development Environment
+
+```yaml
+# docker-compose.dev.yml
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: bettersaas_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_dev_data:
+```
+
+### Production Environment
+
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: bettersaas
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+## Database Migration
+
+### Run Migrations in Docker
+
+```bash
+# Run database migrations
+docker-compose exec app pnpm db:migrate
+
+# Seed database
+docker-compose exec app pnpm db:seed
+
+# Reset database
+docker-compose exec app pnpm db:reset
+```
+
+### Migration Script
+
+Create `scripts/docker-migrate.sh`:
+
+```bash
+#!/bin/bash
+
+# Wait for database to be ready
+until docker-compose exec db pg_isready -U postgres; do
+  echo "Waiting for database..."
+  sleep 2
+done
+
+# Run migrations
+docker-compose exec app pnpm db:migrate
+
+# Seed initial data
+docker-compose exec app pnpm db:seed
+
+echo "Database migration completed!"
+```
+
+## Health Checks
+
+### Application Health Check
+
+```dockerfile
+# Add to Dockerfile
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
+```
+
+### Docker Compose Health Checks
+
+```yaml
+services:
+  app:
+    # ... other config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  db:
+    # ... other config
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+## Monitoring and Logging
+
+### Centralized Logging
+
+```yaml
+# Add to docker-compose.yml
+services:
+  app:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+```
+
+### Monitoring with Prometheus
+
+```yaml
+# docker-compose.monitoring.yml
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  prometheus_data:
+  grafana_data:
+```
+
+## Security Best Practices
+
+### 1. Non-Root User
+
+```dockerfile
+# Create and use non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+USER nextjs
+```
+
+### 2. Security Scanning
+
+```bash
+# Scan for vulnerabilities
+docker scout cves better-saas:latest
+
+# Use security scanner
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  aquasec/trivy image better-saas:latest
+```
+
+### 3. Secrets Management
+
+```yaml
+# Use Docker secrets
+services:
+  app:
+    secrets:
+      - db_password
+      - stripe_secret
+    environment:
+      - DB_PASSWORD_FILE=/run/secrets/db_password
+      - STRIPE_SECRET_KEY_FILE=/run/secrets/stripe_secret
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  stripe_secret:
+    file: ./secrets/stripe_secret.txt
+```
+
+## Performance Optimization
+
+### 1. Multi-stage Builds
+
+Use multi-stage builds to reduce image size:
+
+```dockerfile
+# Build dependencies separately
+FROM node:18-alpine AS deps
+# ... install production dependencies
+
+FROM node:18-alpine AS builder  
+# ... build application
+
+FROM node:18-alpine AS runner
+# ... copy built application
+```
+
+### 2. Layer Caching
+
+```dockerfile
+# Copy package files first for better caching
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+# Copy source code after dependencies
+COPY . .
+RUN pnpm build
+```
+
+### 3. Resource Limits
+
+```yaml
+services:
+  app:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Port Already in Use**
+   ```bash
+   # Check what's using the port
+   lsof -i :3000
+   
+   # Kill the process
+   kill -9 <PID>
+   ```
+
+2. **Database Connection Issues**
+   ```bash
+   # Check database logs
+   docker-compose logs db
+   
+   # Test connection
+   docker-compose exec db psql -U postgres -d bettersaas
+   ```
+
+3. **Build Failures**
+   ```bash
+   # Clean build cache
+   docker system prune -a
+   
+   # Rebuild without cache
+   docker-compose build --no-cache
+   ```
+
+### Debug Mode
+
+```bash
+# Run with debug output
+DEBUG=* docker-compose up
+
+# Access container shell
+docker-compose exec app sh
+
+# View container logs
+docker-compose logs -f app
+```
+
+## Deployment Commands
+
+```bash
+# Development
+docker-compose -f docker-compose.dev.yml up -d
+
+# Production
+docker-compose -f docker-compose.prod.yml up -d
+
+# With monitoring
+docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+
+# Scale services
+docker-compose up -d --scale app=3
+```
+
+## Next Steps
+
+- Set up [CI/CD Pipeline](./ci-cd)
+- Configure [Production Setup](./production-setup)
+- Monitor with [Observability Tools](../development/monitoring)
+- Implement [Security Best Practices](../development/security)
