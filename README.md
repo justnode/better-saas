@@ -150,6 +150,7 @@ This project is licensed under the MIT License.
 
 ## 🤝 Community & Support
 Scan the code to add the author's WeChat, you will be invited to the exclusive Q&A WeChat group to get the video tutorials and practical project codes that come with it.
-<div className="flex justify-center">
-  <img src="/images/wechat.png" alt="WeChat" className="w-1/2 h-auto" />
+<div align="center">
+  <img src="public/images/wechat.png" alt="WeChat" width="50%" />
 </div>
+

@@ -143,6 +143,6 @@
 
 ## 🤝 社区与支持
 扫码添加作者微信，邀请你进入专属答疑微信群，获取配套的视频教程和实战项目代码。
-<div className="flex justify-center">
-  <img src="/images/wechat.png" alt="WeChat" className="w-1/2 h-auto" />
+<div align="center">
+  <img src="public/images/wechat.png" alt="WeChat" width="50%" />
 </div>
