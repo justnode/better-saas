@@ -1,10 +1,6 @@
 ---
 title: Authentication
-description: Comprehensive authentication system with multi-provider OAuth, role-based access control, and session management
 ---
-
-# Authentication
-
 Better SaaS features a robust authentication system built with Better Auth, supporting multiple OAuth providers, role-based access control, and secure session management.
 
 ## Overview
@@ -883,10 +879,3 @@ psql -d bettersaas -c "SELECT id, email, role FROM users;"
 # Test OAuth endpoints
 curl -X GET http://localhost:3000/api/auth/providers
 ```
-
-## Next Steps
-
-- Configure [Payment & Billing](./payment-billing) integration
-- Set up [File Management](./file-management) with proper permissions
-- Implement [Admin Dashboard](./admin-dashboard) with role-based access
-- Review [User Management](./user-management) features 

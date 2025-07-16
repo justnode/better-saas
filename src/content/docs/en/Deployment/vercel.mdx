@@ -1,10 +1,6 @@
 ---
 title: Vercel Deployment
-description: Deploy your Better SaaS application to Vercel with one-click deployment
 ---
-
-# Vercel Deployment
-
 Deploy your Better SaaS application to Vercel with seamless integration and automatic deployments. Vercel provides the best developer experience for Next.js applications with zero configuration.
 
 ## 🚀 Quick Deployment
@@ -102,7 +98,16 @@ R2_PUBLIC_URL=https://your-production-domain.com
 
 Choose one of these options for your production database:
 
-#### Option 1: Vercel Postgres (Recommended)
+#### Option 1: External PostgreSQL (Recommended)
+
+Popular PostgreSQL hosting options:
+- **Neon** - [neon.tech](https://neon.tech/) (Recommended)
+- **Supabase** - [supabase.com](https://supabase.com/)
+- **PlanetScale** - [planetscale.com](https://planetscale.com/)
+
+Login to Neon, create a new project, click "Connect" in the project panel, copy the database URL, and add the database URL to the `DATABASE_URL` variable in your .env file.
+
+#### Option 2: Vercel Postgres
 
 1. **Add Vercel Postgres to your project:**
    ```bash
@@ -116,14 +121,6 @@ Choose one of these options for your production database:
 
 3. **Get connection details:**
    - The `DATABASE_URL` will be automatically added to your environment variables
-
-#### Option 2: External PostgreSQL
-
-Popular PostgreSQL hosting options:
-- **Supabase** - [supabase.com](https://supabase.com/)
-- **PlanetScale** - [planetscale.com](https://planetscale.com/)
-- **Railway** - [railway.app](https://railway.app/)
-- **Neon** - [neon.tech](https://neon.tech/)
 
 ### Database Migration
 
@@ -409,16 +406,5 @@ Before deploying to production:
 - ✅ Monitor Core Web Vitals
 - ✅ Use Vercel Analytics for insights
 
-## 📚 Next Steps
-
-After successful deployment:
-
-1. **Configure monitoring** - Set up error tracking and performance monitoring
-2. **Set up CI/CD** - Configure automated testing and deployment
-3. **Domain setup** - Configure custom domain and SSL
-4. **Backup strategy** - Implement database backup and recovery
-5. **Scaling** - Monitor performance and scale as needed
-
----
 
 **Congratulations!** Your Better SaaS application is now live on Vercel. Monitor your application's performance and scale as your user base grows.
