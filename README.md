@@ -50,13 +50,22 @@ A modern, full-stack SaaS application built with Next.js 15, featuring authentic
 
 ## 📖 Documentation
 
-Built-in documentation is available at `/docs` and includes:
+Complete project documentation has been migrated to our online documentation site:
 
-- Architecture overview
-- Installation guide
-- API documentation
-- Component library
-- Testing guide
+**🌐 [https://www.better-saas.org/docs](https://www.better-saas.org/docs)**
+
+The online documentation includes:
+
+- 🏗️ Architecture design and system overview
+- 📦 Detailed installation and configuration guide
+- 🔧 API documentation with examples
+- 🎨 UI component library usage guide
+- 🧪 Testing strategies and best practices
+- 🚀 Deployment guide and production setup
+- 🌍 Internationalization implementation
+- 💳 Payment integration and subscription management
+
+> 💡 **Tip**: The online documentation is continuously updated. We recommend bookmarking it for the latest information.
 
 ## 🚀 Quick Start
 
