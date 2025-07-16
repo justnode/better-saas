@@ -1,5 +1,7 @@
 # Better SaaS
 
+[English](README.md) | 中文版 
+
 一个现代化的全栈 SaaS 应用程序，基于 Next.js 15 构建，集成了身份验证、支付、文件管理和国际化功能，并配备了全面的测试套件。
 
 ## 🚀 功能特性
@@ -138,3 +140,9 @@
 ## 📄 许可证
 
 本项目基于 MIT 许可证。 
+
+## 🤝 社区与支持
+扫码添加作者微信，邀请你进入专属答疑微信群，获取配套的视频教程和实战项目代码。
+<div className="flex justify-center">
+  <img src="/images/wechat.png" alt="WeChat" className="w-1/2 h-auto" />
+</div>
