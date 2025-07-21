@@ -33,8 +33,6 @@
     "analyze": "ANALYZE=true pnpm build",
     "analyze:server": "BUNDLE_ANALYZE=server pnpm build",
     "analyze:browser": "BUNDLE_ANALYZE=browser pnpm build",
-    "analyze:bundle": "tsx scripts/analyze-bundle.ts",
-    "optimize:cloudflare": "tsx scripts/optimize-cloudflare-bundle.ts",
     "size-check": "bundlesize"
   },
   "dependencies": {
@@ -115,8 +113,19 @@
     "tw-animate-css": "^1.3.4",
     "typescript": "^5.8.2",
     "undici": "^7.11.0",
-    "webpack-bundle-analyzer": "^4.10.2",
     "wrangler": "^4.25.0"
   },
-  "packageManager": "pnpm@10.6.4"
+  "packageManager": "pnpm@10.6.4",
+  "bundlesize":[
+    {
+      "path": ".next/static/chunks/*.js",
+      "maxSize": "200kb",
+      "compression": "gzip"
+    },
+    {
+      "path": ".next/static/css/*.css",
+      "maxSize": "50kb",
+      "compression": "gzip"
+    }
+  ]
 }
