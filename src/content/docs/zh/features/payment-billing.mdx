@@ -577,9 +577,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Calendar, CreditCard, Download, ExternalLink } from "lucide-react"
-import { getBillingInfo } from "@/server/actions/payment/get-billing-info"
-import { cancelSubscription } from "@/server/actions/payment/cancel-subscription"
-
 interface BillingInfo {
   subscription: {
     id: string

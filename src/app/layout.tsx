@@ -67,7 +67,22 @@ export default async function RootLayout({
       className={`${geist.variable} ${geistMono.variable} antialiased`}
       suppressHydrationWarning
     >
-      <body>{children}</body>
+      <body>
+        {/* fix Cloudflare Workers _name error */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof globalThis !== 'undefined' && typeof globalThis.__name === 'undefined') {
+                globalThis.__name = function(fn, name) { return fn; };
+              }
+              if (typeof window !== 'undefined' && typeof window.__name === 'undefined') {
+                window.__name = function(fn, name) { return fn; };
+              }
+            `,
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

@@ -18,6 +18,10 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "admin:setup": "tsx scripts/setup-admin.ts",
+    "cf:dev":"wrangler dev --port 3000",
+    "cf:preview": "opennextjs-cloudflare build && wrangler dev --port 3000",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
     "test": "jest",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
@@ -31,6 +35,7 @@
     "@aws-sdk/client-s3": "^3.842.0",
     "@aws-sdk/s3-request-presigner": "^3.842.0",
     "@neondatabase/serverless": "^1.0.1",
+    "@opennextjs/cloudflare": "^1.5.1",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-avatar": "^1.1.10",
@@ -106,7 +111,8 @@
     "tsx": "^4.20.3",
     "tw-animate-css": "^1.3.4",
     "typescript": "^5.8.2",
-    "undici": "^7.11.0"
+    "undici": "^7.11.0",
+    "wrangler": "^4.25.0"
   },
   "ct3aMetadata": {
     "initVersion": "7.39.3"

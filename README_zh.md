@@ -153,5 +153,9 @@
 ## 🤝 社区与支持
 扫码添加作者微信，邀请你进入专属答疑微信群，获取配套的视频教程和实战项目代码。
 <div align="center">
-  <img src="public/images/wechat.png" alt="WeChat" width="50%" />
+  <img src="public/images/wechat.png" alt="WeChat" width="30%" />
 </div>
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=justnode/better-saas&type=Date)](https://www.star-history.com/#justnode/better-saas&Date)

@@ -17,9 +17,9 @@ const config: NextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: '10mb', // 支持最大10MB的文件上传
+      bodySizeLimit: '10mb',
     },
-  },
+  }
 };
 
 const withMDX = createMDX();

@@ -33,11 +33,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# local env files
-# do not commit any .env files to git, except for the .env.example file. https://create.t3.gg/en/usage/env-variables#using-environment-variables
 .env
-.env.test
-.env*.local
+.env.*
+.dev.vars
 
 # vercel
 .vercel
@@ -59,3 +57,7 @@ yarn-error.log*
 /docs/
 
 /.cursor
+CLAUDE.md
+
+/.open-next
+/.wrangler

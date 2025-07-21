@@ -160,6 +160,9 @@ This project is licensed under the MIT License.
 ## 🤝 Community & Support
 Scan the code to add the author's WeChat, you will be invited to the exclusive Q&A WeChat group to get the video tutorials and practical project codes that come with it.
 <div align="center">
-  <img src="public/images/wechat.png" alt="WeChat" width="50%" />
+  <img src="public/images/wechat.png" alt="WeChat" width="30%" />
 </div>
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=justnode/better-saas&type=Date)](https://www.star-history.com/#justnode/better-saas&Date)
