@@ -4,12 +4,18 @@ import { getDocsPage, getDocsPages } from '@/lib/fumadocs/docs';
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page';
 import { notFound } from 'next/navigation';
 
+// staic generate
+export const dynamic = 'force-static';
+export const revalidate = 3600; // 1 hour 
+
 interface Props {
   params: Promise<{
     locale: string;
     slug?: string[];
   }>;
 }
+
+
 
 export default async function Page({ params }: Props) {
   const { locale, slug } = await params;

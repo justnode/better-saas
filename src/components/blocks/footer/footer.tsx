@@ -1,9 +1,9 @@
 import {
-  IconBrandFacebook,
-  IconBrandInstagram,
-  IconBrandLinkedin,
-  IconBrandTwitter,
-} from '@tabler/icons-react';
+  Facebook as IconBrandFacebook,
+  Instagram as IconBrandInstagram,
+  Linkedin as IconBrandLinkedin,
+  Twitter as IconBrandTwitter,
+} from '@/lib/icons';
 import type React from 'react';
 
 interface FooterProps {
@@ -61,10 +61,10 @@ const defaultSections = [
 ];
 
 const defaultSocialLinks = [
-  { icon: <IconBrandInstagram stroke={1} className="size-5" />, href: '#', label: 'Instagram' },
-  { icon: <IconBrandFacebook stroke={1} className="size-5" />, href: '#', label: 'Facebook' },
-  { icon: <IconBrandTwitter stroke={1} className="size-5" />, href: '#', label: 'Twitter' },
-  { icon: <IconBrandLinkedin stroke={1} className="size-5" />, href: '#', label: 'LinkedIn' },
+  { icon: <IconBrandInstagram strokeWidth={1} className="size-5" />, href: '#', label: 'Instagram' },
+  { icon: <IconBrandFacebook strokeWidth={1} className="size-5" />, href: '#', label: 'Facebook' },
+  { icon: <IconBrandTwitter strokeWidth={1} className="size-5" />, href: '#', label: 'Twitter' },
+  { icon: <IconBrandLinkedin strokeWidth={1} className="size-5" />, href: '#', label: 'LinkedIn' },
 ];
 
 const defaultLegalLinks = [

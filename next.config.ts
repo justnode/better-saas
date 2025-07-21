@@ -9,6 +9,10 @@ import './src/env';
 
 const withNextIntl = createNextIntlPlugin();
 
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
 const config: NextConfig = {
   devIndicators: false,
   reactStrictMode: true,
@@ -23,4 +27,4 @@ const config: NextConfig = {
 };
 
 const withMDX = createMDX();
-export default withNextIntl(withMDX(config));
+export default withBundleAnalyzer(withNextIntl(withMDX(config)));

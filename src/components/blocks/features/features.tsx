@@ -8,7 +8,7 @@ import {
   IconHelp,
   IconRouteAltLeft,
   IconTerminal2,
-} from '@tabler/icons-react';
+} from '@/lib/icons';
 
 export function Features() {
   const features = [

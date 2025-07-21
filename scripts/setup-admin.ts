@@ -21,7 +21,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { neon } from '@neondatabase/serverless';
 import { user } from '../src/server/db/schema';
-import { createChildLogger } from '@/lib/logger/logger';
+import { createChildLogger } from '../src/lib/logger/logger';
 
 const setupAdminLogger = createChildLogger('setup-admin');
 

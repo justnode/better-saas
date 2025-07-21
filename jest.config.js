@@ -20,7 +20,7 @@ const customJestConfig = {
     '^next/font/(.*)$': '<rootDir>/tests/__mocks__/fileMock.js',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(@t3-oss|next-intl|use-intl|@mswjs|msw|@radix-ui|nanostores|better-auth|zustand)/)',
+    'node_modules/(?!(@t3-oss|next-intl|use-intl|@radix-ui|nanostores|better-auth|zustand)/)',
   ],
   // Remove custom transform config to use Next.js defaults
   collectCoverageFrom: [
