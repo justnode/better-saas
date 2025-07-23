@@ -9,7 +9,7 @@ import type {
   SubscriptionResult,
   PaymentStatus,
 } from '@/payment/types';
-import type Stripe from 'stripe';
+import type { Stripe as StripeTypes } from 'stripe';
 import type { SubscriptionWithPeriod } from '@/types/stripe-extended';
 import { ErrorLogger } from '@/lib/logger/logger-utils';
 
@@ -187,7 +187,7 @@ export class StripeProvider implements PaymentProvider {
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
         currentPeriodStart: subscriptionWithPeriod.current_period_start ? new Date(subscriptionWithPeriod.current_period_start * 1000) : new Date(),
         currentPeriodEnd: subscriptionWithPeriod.current_period_end ? new Date(subscriptionWithPeriod.current_period_end * 1000) : new Date(),
-        clientSecret: (subscription.latest_invoice as Stripe.Invoice & { payment_intent?: Stripe.PaymentIntent })?.payment_intent?.client_secret || undefined,
+        clientSecret: (subscription.latest_invoice as StripeTypes.Invoice & { payment_intent?: StripeTypes.PaymentIntent })?.payment_intent?.client_secret || undefined,
       };
     } catch (error) {
       stripeErrorLogger.logError(error as Error, {
@@ -207,7 +207,7 @@ export class StripeProvider implements PaymentProvider {
     try {
       const { priceId, cancelAtPeriodEnd, metadata } = params;
 
-      const updateData: Stripe.SubscriptionUpdateParams = {};
+      const updateData: StripeTypes.SubscriptionUpdateParams = {};
 
       if (priceId) {
         const currentSubscription = await stripe.subscriptions.retrieve(subscriptionId);

@@ -20,7 +20,7 @@
     "admin:setup": "tsx scripts/setup-admin.ts",
     "cf:dev": "wrangler dev --port 3000",
     "cf:preview": "opennextjs-cloudflare build && wrangler dev --port 3000",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:deploy": "NEXT_PUBLIC_APP_URL=https://cf.better-saas.org opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf:upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
     "test": "jest",
     "test:unit": "jest tests/unit",

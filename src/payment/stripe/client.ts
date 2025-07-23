@@ -1,4 +1,4 @@
-import Stripe from 'stripe';
+import { Stripe } from 'stripe';
 import { env } from '@/env';
 import { paymentConfig } from '../../config/payment.config';
 
