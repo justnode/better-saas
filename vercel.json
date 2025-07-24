@@ -11,10 +11,6 @@
     },
     "src/app/api/health/route.ts": {
       "runtime": "edge"
-    },
-    "src/app/api/webhooks/stripe/route.ts": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 30
     }
   },
   "framework": "nextjs"
