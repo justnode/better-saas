@@ -17,6 +17,5 @@
       "maxDuration": 30
     }
   },
-  "regions": ["sin1", "hnd1", "iad1"],
   "framework": "nextjs"
 }
