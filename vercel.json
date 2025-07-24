@@ -4,14 +4,5 @@
       "main": true,
       "*": false
     }
-  },
-  "functions": {
-    "src/app/api/auth/[...all]/route.ts": {
-      "runtime": "@vercel/edge"
-    },
-    "src/app/api/health/route.ts": {
-      "runtime": "@vercel/edge"
-    }
-  },
-  "framework": "nextjs"
+  }
 }
