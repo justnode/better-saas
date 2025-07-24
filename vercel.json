@@ -7,10 +7,10 @@
   },
   "functions": {
     "src/app/api/auth/[...all]/route.ts": {
-      "runtime": "edge"
+      "runtime": "@vercel/edge"
     },
     "src/app/api/health/route.ts": {
-      "runtime": "edge"
+      "runtime": "@vercel/edge"
     }
   },
   "framework": "nextjs"
