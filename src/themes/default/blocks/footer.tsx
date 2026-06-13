@@ -90,7 +90,7 @@ export const Footer = ({
   sections = defaultSections,
   description = 'A collection of components for your startup business or side project.',
   socialLinks = defaultSocialLinks,
-  copyright = '© 2025 Better-SaaS. All rights reserved.',
+  copyright = `© ${new Date().getFullYear()} Better-SaaS. All rights reserved.`,
   legalLinks = defaultLegalLinks,
 }: FooterProps) => {
   return (

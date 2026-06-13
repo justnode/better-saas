@@ -1,0 +1,23 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        # set up pnpm
+        - npm install -g pnpm@10.6.4
+        # install project dependencies
+        - pnpm install --frozen-lockfile
+    build:
+      commands:
+        # build Next.js application
+        - pnpm run build
+  artifacts:
+    # Next.js 15 output directory
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      # cache dependencies and build artifacts to speed up subsequent builds
+      - node_modules/**/*
+      - .next/cache/**/*hi
