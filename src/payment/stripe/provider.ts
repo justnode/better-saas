@@ -9,7 +9,7 @@ import type {
   SubscriptionResult,
   UpdateSubscriptionParams,
 } from '@/payment/types';
-import type { SubscriptionWithPeriod } from '@/types/stripe-extended';
+import { getSubscriptionPeriod, type SubscriptionWithPeriod } from '@/types/stripe-extended';
 import { stripe, stripeConfig } from './client';
 
 export class StripeProvider implements PaymentProvider {
@@ -163,6 +163,7 @@ export class StripeProvider implements PaymentProvider {
       });
 
       const subscriptionWithPeriod = subscription as unknown as SubscriptionWithPeriod;
+      const period = getSubscriptionPeriod(subscriptionWithPeriod);
 
       return {
         id: subscription.id,
@@ -170,23 +171,15 @@ export class StripeProvider implements PaymentProvider {
         customerId,
         priceId,
         interval: (price.recurring?.interval as 'month' | 'year') || null,
-        periodStart: subscriptionWithPeriod.current_period_start
-          ? new Date(subscriptionWithPeriod.current_period_start * 1000)
-          : undefined,
-        periodEnd: subscriptionWithPeriod.current_period_end
-          ? new Date(subscriptionWithPeriod.current_period_end * 1000)
-          : undefined,
+        periodStart: period.start ? new Date(period.start * 1000) : undefined,
+        periodEnd: period.end ? new Date(period.end * 1000) : undefined,
         trialStart: subscription.trial_start
           ? new Date(subscription.trial_start * 1000)
           : undefined,
         trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : undefined,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        currentPeriodStart: subscriptionWithPeriod.current_period_start
-          ? new Date(subscriptionWithPeriod.current_period_start * 1000)
-          : new Date(),
-        currentPeriodEnd: subscriptionWithPeriod.current_period_end
-          ? new Date(subscriptionWithPeriod.current_period_end * 1000)
-          : new Date(),
+        currentPeriodStart: period.start ? new Date(period.start * 1000) : new Date(),
+        currentPeriodEnd: period.end ? new Date(period.end * 1000) : new Date(),
         clientSecret:
           (
             subscription.latest_invoice as StripeTypes.Invoice & {
@@ -245,7 +238,7 @@ export class StripeProvider implements PaymentProvider {
 
       const price = await stripe.prices.retrieve(priceItem.price.id);
 
-      const subscriptionWithPeriod = subscription as unknown as SubscriptionWithPeriod;
+      const period = getSubscriptionPeriod(subscription as unknown as SubscriptionWithPeriod);
 
       return {
         id: subscription.id,
@@ -253,23 +246,15 @@ export class StripeProvider implements PaymentProvider {
         customerId: subscription.customer as string,
         priceId: priceItem.price.id,
         interval: (price.recurring?.interval as 'month' | 'year') || null,
-        periodStart: subscriptionWithPeriod.current_period_start
-          ? new Date(subscriptionWithPeriod.current_period_start * 1000)
-          : undefined,
-        periodEnd: subscriptionWithPeriod.current_period_end
-          ? new Date(subscriptionWithPeriod.current_period_end * 1000)
-          : undefined,
+        periodStart: period.start ? new Date(period.start * 1000) : undefined,
+        periodEnd: period.end ? new Date(period.end * 1000) : undefined,
         trialStart: subscription.trial_start
           ? new Date(subscription.trial_start * 1000)
           : undefined,
         trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : undefined,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        currentPeriodStart: subscriptionWithPeriod.current_period_start
-          ? new Date(subscriptionWithPeriod.current_period_start * 1000)
-          : new Date(),
-        currentPeriodEnd: subscriptionWithPeriod.current_period_end
-          ? new Date(subscriptionWithPeriod.current_period_end * 1000)
-          : new Date(),
+        currentPeriodStart: period.start ? new Date(period.start * 1000) : new Date(),
+        currentPeriodEnd: period.end ? new Date(period.end * 1000) : new Date(),
       };
     } catch (error) {
       console.error('[stripe-provider] updateSubscription error:', error);
@@ -306,7 +291,7 @@ export class StripeProvider implements PaymentProvider {
 
       const price = await stripe.prices.retrieve(priceItem.price.id);
 
-      const subscriptionWithPeriod = subscription as unknown as SubscriptionWithPeriod;
+      const period = getSubscriptionPeriod(subscription as unknown as SubscriptionWithPeriod);
 
       return {
         id: subscription.id,
@@ -314,23 +299,15 @@ export class StripeProvider implements PaymentProvider {
         customerId: subscription.customer as string,
         priceId: priceItem.price.id,
         interval: (price.recurring?.interval as 'month' | 'year') || null,
-        periodStart: subscriptionWithPeriod.current_period_start
-          ? new Date(subscriptionWithPeriod.current_period_start * 1000)
-          : undefined,
-        periodEnd: subscriptionWithPeriod.current_period_end
-          ? new Date(subscriptionWithPeriod.current_period_end * 1000)
-          : undefined,
+        periodStart: period.start ? new Date(period.start * 1000) : undefined,
+        periodEnd: period.end ? new Date(period.end * 1000) : undefined,
         trialStart: subscription.trial_start
           ? new Date(subscription.trial_start * 1000)
           : undefined,
         trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : undefined,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        currentPeriodStart: subscriptionWithPeriod.current_period_start
-          ? new Date(subscriptionWithPeriod.current_period_start * 1000)
-          : new Date(),
-        currentPeriodEnd: subscriptionWithPeriod.current_period_end
-          ? new Date(subscriptionWithPeriod.current_period_end * 1000)
-          : new Date(),
+        currentPeriodStart: period.start ? new Date(period.start * 1000) : new Date(),
+        currentPeriodEnd: period.end ? new Date(period.end * 1000) : new Date(),
       };
     } catch (error) {
       console.error('[stripe-provider] getSubscription error:', error);

@@ -6,7 +6,11 @@ import { creditService } from '@/lib/credits';
 import { StripeProvider } from '@/payment/stripe/provider';
 import type { PaymentStatus } from '@/payment/types';
 import { paymentRepository } from '@/server/db/repositories/payment-repository';
-import type { InvoiceWithSubscription, SubscriptionWithPeriod } from '@/types/stripe-extended';
+import {
+  getSubscriptionPeriod,
+  type InvoiceWithSubscription,
+  type SubscriptionWithPeriod,
+} from '@/types/stripe-extended';
 
 const stripeProvider = new StripeProvider();
 
@@ -290,6 +294,7 @@ async function handleCheckoutSessionCompleted(event: StripeTypes.Event) {
 
       // type assertion to extended type
       const subscription = subscriptionResponse as unknown as SubscriptionWithPeriod;
+      const period = getSubscriptionPeriod(subscription);
 
       // get price ID from subscription
       const subscriptionItem = subscription.items.data[0];
@@ -318,12 +323,8 @@ async function handleCheckoutSessionCompleted(event: StripeTypes.Event) {
         customerId: session.customer as string,
         subscriptionId: subscriptionId,
         status: subscription.status as PaymentStatus,
-        periodStart: subscription.current_period_start
-          ? new Date(subscription.current_period_start * 1000)
-          : undefined,
-        periodEnd: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000)
-          : undefined,
+        periodStart: period.start ? new Date(period.start * 1000) : undefined,
+        periodEnd: period.end ? new Date(period.end * 1000) : undefined,
         trialStart: subscription.trial_start
           ? new Date(subscription.trial_start * 1000)
           : undefined,
@@ -424,8 +425,7 @@ async function handleSubscriptionCreated(event: StripeTypes.Event) {
     }
 
     // safely handle timestamp conversion
-    const currentPeriodStart = subscription.current_period_start;
-    const currentPeriodEnd = subscription.current_period_end;
+    const { start: currentPeriodStart, end: currentPeriodEnd } = getSubscriptionPeriod(subscription);
 
     // update payment record status
     await paymentRepository.update(paymentRecord.id, {
@@ -473,8 +473,7 @@ async function handleSubscriptionUpdated(event: StripeTypes.Event) {
     }
 
     // safely handle timestamp conversion
-    const currentPeriodStart = subscription.current_period_start;
-    const currentPeriodEnd = subscription.current_period_end;
+    const { start: currentPeriodStart, end: currentPeriodEnd } = getSubscriptionPeriod(subscription);
 
     // update payment record status and price ID
     await paymentRepository.update(paymentRecord.id, {
